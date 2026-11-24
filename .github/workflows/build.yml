@@ -101,14 +101,19 @@ jobs:
           lipo -info "$o/NIQUE D0.vst3/Contents/MacOS/NIQUE D0"
           cp README.md $o/
           ditto -c -k --sequesterRsrc --keepParent $o $o.zip
+          tar -czf $o.tar.gz $o              # (the same as a .tar.gz, to send on)
 
       - uses: actions/upload-artifact@v4
         with:
           name: NIQUED0-${{ matrix.name }}
-          path: NIQUED0-*.zip
+          path: |
+            NIQUED0-*.zip
+            NIQUED0-*.tar.gz
 
       - name: release
         if: startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'release' || github.event_name == 'push')
         uses: softprops/action-gh-release@v2
         with:
-          files: NIQUED0-*.zip
+          files: |
+            NIQUED0-*.zip
+            NIQUED0-*.tar.gz
