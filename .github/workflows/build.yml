@@ -1,0 +1,114 @@
+# Builds NIQUE D0 for Windows (VST3, Standalone) and the Mac (VST3, AU, Standalone; Apple Silicon and Intel) on every push. The zips are under the run's "Artifacts"; a tag v* (or a release published on GitHub) also puts them
+# in its release.
+name: build
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+  release:                               # a release published on GitHub (its tag v*): the zips added to it
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  # the engine's tests (tests/engine_tests.cpp): every program at three rates, any buffer size, every parameter swept,
+  # every effect, all at once; no JUCE needed
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: build
+        run: cmake -S tests -B build-tests -DCMAKE_BUILD_TYPE=Release && cmake --build build-tests --parallel 4
+      - name: run
+        run: build-tests/engine_tests
+
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            name: Windows
+          - os: macos-latest
+            name: macOS
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: configure
+        shell: bash
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: build
+        shell: bash
+        run: cmake --build build --config Release --parallel 4
+
+      - name: pluginval (Windows)
+        # the plugin checked as a host would: loading, its parameters fuzzed, state saved and restored, the editor
+        # opened, every buffer size and rate (Tracktion's pluginval, strictness 8)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri https://github.com/Tracktion/pluginval/releases/download/v1.0.4/pluginval_Windows.zip -OutFile pluginval.zip
+          Expand-Archive pluginval.zip -DestinationPath pluginval
+          $p = Start-Process -FilePath pluginval/pluginval.exe -ArgumentList '--strictness-level','8','--timeout-ms','600000','--output-dir','pluginval-log','--validate','"build/NiqueD0_artefacts/Release/VST3/NIQUE D0.vst3"' -Wait -PassThru -NoNewWindow
+          Get-ChildItem pluginval-log -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName | Select-Object -Last 60 }
+          if ($p.ExitCode -ne 0) { throw "pluginval failed ($($p.ExitCode))" }
+
+      - uses: actions/upload-artifact@v4
+        if: always() && runner.os == 'Windows'
+        with:
+          name: pluginval-log
+          path: pluginval-log
+          if-no-files-found: ignore
+
+      - name: package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $a = "build/NiqueD0_artefacts/Release"
+          $o = "NIQUED0-Windows"
+          New-Item -ItemType Directory -Force $o | Out-Null
+          Copy-Item -Recurse "$a/VST3/NIQUE D0.vst3" $o/
+          Copy-Item "$a/Standalone/NIQUE D0.exe" $o/
+          Copy-Item README.md $o/
+          Compress-Archive -Path $o -DestinationPath NIQUED0-Windows.zip
+
+      - name: auval (macOS)
+        # the Audio Unit checked as Logic and Ableton check it (informative: a failure here does not stop the build)
+        if: runner.os == 'macOS'
+        continue-on-error: true
+        shell: bash
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R "build/NiqueD0_artefacts/Release/AU/NIQUE D0.component" ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar || true
+          auval -v aumu Nqd0 Swtd
+
+      - name: package (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          a="build/NiqueD0_artefacts/Release"
+          o=NIQUED0-macOS
+          mkdir -p $o
+          cp -R "$a/VST3/NIQUE D0.vst3" "$a/AU/NIQUE D0.component" "$a/Standalone/NIQUE D0.app" $o/
+          for b in $o/*.vst3 $o/*.component $o/*.app; do codesign --force --deep -s - "$b"; done
+          lipo -info "$o/NIQUE D0.vst3/Contents/MacOS/NIQUE D0"
+          cp README.md $o/
+          ditto -c -k --sequesterRsrc --keepParent $o $o.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NIQUED0-${{ matrix.name }}
+          path: NIQUED0-*.zip
+
+      - name: release
+        if: startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'release' || github.event_name == 'push')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: NIQUED0-*.zip
