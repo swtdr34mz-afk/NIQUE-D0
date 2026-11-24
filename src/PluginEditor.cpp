@@ -11,7 +11,7 @@ static String U(const char *s) { return String::fromUTF8(s); }
 /* --------------------------------------------------------------------------- names for the displays --- */
 static String waveShort(int w)
 {
-    static const char *const P[4] = {"PUL", "SAW", "TRI", "SIN"};
+    static const char *const P[4] = {"PU", "SA", "tr", "Si"};
     if (w >= 0 && w < 4)
         return P[w];
     return PARAMS[OSC_WAVE].choices[jlimit(0, 46, w)];
@@ -25,19 +25,19 @@ static String waveGroup(int w)
 
 static String configShort(int c)
 {
-    static const char *const ONE[4] = {"PIT", "SHP", "SYN", "DET"};
+    static const char *const ONE[4] = {"Pit", "SHP", "SYn", "dEt"};
     if (c < 4)
         return ONE[c];
     if (c < 40) {
-        static const char *const W[4] = {"SI", "TR", "SA", "SQ"};
+        static const char *const W[4] = {"Si", "tr", "SA", "Sq"};
         int h = (c - 4) % 9;
-        return String(W[(c - 4) / 9]) + (h == 0 ? " S" : " " + String(h));
+        return String(W[(c - 4) / 9]) + (h == 0 ? "Sb" : " " + String(h));
     }
     if (c < 53) {
-        static const char *const F[13] = {"F.5", "FM1", "F1.4", "F1.5", "FM2", "F2.8", "FM3", "F3.5", "FM4", "FM5", "FM6", "FM7", "FM8"};
+        static const char *const F[13] = {"F.5", "F 1", "F1.4", "F1.5", "F 2", "F2.8", "F 3", "F3.5", "F 4", "F 5", "F 6", "F 7", "F 8"};
         return F[c - 40];
     }
-    return c == 53 ? "AM" : "NOIS";
+    return c == 53 ? "An" : "nOiS";
 }
 
 static String configGroup(int c)
@@ -72,8 +72,8 @@ void NiqueEditor::Page::paint(Graphics &g)
         cacheScale = sc;
         cache = Image(Image::RGB, (int)std::ceil((float)getWidth() * sc), (int)std::ceil((float)getHeight() * sc), false);
         Graphics cg(cache);
+        drawPanel(cg, getLocalBounds().toFloat(), sc);
         cg.addTransform(AffineTransform::scale(sc));
-        drawPanel(cg, getLocalBounds().toFloat());
         for (auto &s : sections)
             if (s.sub)
                 drawSub(cg, s.r, s.title);
@@ -130,7 +130,7 @@ struct NiqueEditor::Header : Component {
         g.drawText(grp, name().reduced(8.0f, 0.0f), Justification::centredRight, true);
         drawLabel(g, "LIKES", {872.0f, 1.0f, 70.0f, 14.0f}, 9.5f, Justification::centredLeft);
         int n = ed.proc.numLikes();
-        drawDisplay(g, likeNum(), n == 0 ? String("--") : String(ed.proc.likePos + 1) + "/" + String(n), 5);
+        drawDisplay(g, likeNum(), n == 0 ? String("--") : String(ed.proc.likePos + 1) + "-" + String(n), 5);
         drawLcd(g, read());
         if (ed.inHand) {
             g.setFont(font(Face::mono, 15.0f));
@@ -252,11 +252,11 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     sel("voice_mode", {"POLY", "MONO", "LEGATO"}, {284, 326, 104, 90}, "MODE");
     sel("unison", {"OFF", "1", "2", "3"}, {206, 424, 80, 114}, "UNISON");
     {
-        auto *bend = add(new Endless(a, "bend", ui, [](int c) { return String(PARAMS[BEND].choices[c]); },
-                                     [](int c) { return String(PARAMS[BEND].choices[c]) + (c == 0 ? "" : c < 15 ? " semitones" : ""); }),
+        auto *bend = add(new Endless(a, "bend", ui, [](int c) { return c == 0 ? String("oFF") : c == 15 ? String("-12") : c == 16 ? String("-24") : String(PARAMS[BEND].choices[c]); },
+                                     [](int c) { return String(PARAMS[BEND].choices[c]) + (c == 0 ? "" : c < 15 ? " semitones" : " (up / down)"); }),
                          {296, 436, 92, 54});
         bend->knob = false;
-        bend->ghost = 6;
+        bend->ghost = 3;
         bend->legend = "BEND RANGE";
     }
 
@@ -290,7 +290,7 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     section({716, 92, 116, 312}, "MODULATION", true);
     knob("osc_lfo", "LFO AMT", {722, 104, 104, 112});
     knob("osc_menv", "MODENV AMT", {722, 238, 104, 112});
-    page.arrows.push_back({774.0f, 360.0f, 870.0f, 430.0f});
+    page.arrows.push_back({800.0f, 408.0f, 880.0f, 440.0f});
     {
         auto *w = add(new Endless(a, "osc_wave", ui, waveShort, [](int w) { return String(waveLongName(w)); }, waveGroup),
                       {846, 90, 120, 146});
@@ -332,7 +332,7 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     section({1122, 92, 100, 312}, "MODULATION", true);
     knob("flt_lfo", "LFO AMT", {1126, 104, 92, 106});
     knob("flt_menv", "MODENV AMT", {1126, 238, 92, 106});
-    page.arrows.push_back({1172.0f, 356.0f, 1250.0f, 230.0f});
+    page.arrows.push_back({1224.0f, 196.0f, 1252.0f, 196.0f});
     auto *freq = knob("flt_freq", "FREQ", {1228, 84, 180, 196});
     freq->redCap = true;
     knob("flt_res", "RESONANCE", {1228, 292, 92, 104});

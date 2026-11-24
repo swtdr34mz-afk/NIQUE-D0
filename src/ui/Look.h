@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 swtdr34mz (NIQUE D0) */
-/* NIQUE D0's look: a red metal panel, dark grey sections framed in white, their names in black bars; black knobs
- * with a printed 0-10 scale (a red cap on FREQ), a green morph LED under each knob that can morph; dark rubber keys
- * with red LEDs; red LED displays. Fonts embedded (Fira Sans, Anonymous Pro: SIL OFL, fonts/). */
+/* NIQUE D0's look, after the instrument: a red enamel frame round an anthracite plate, grey sections with white
+ * print and their names in tabs; tall black fluted knobs with a white line and a printed 0-10 (a red top on FREQ), a
+ * green morph LED by each knob that can morph; grey and black rubber keys with red LEDs; red 7-segment displays; a
+ * wooden pitch stick. Drawn as vectors, the background at the screen's own pixel density (sharp up to 8K). Fonts embedded (Fira Sans, Anonymous Pro: SIL OFL, fonts/). */
 #pragma once
 #include <juce_audio_utils/juce_audio_utils.h>
 
@@ -34,16 +35,17 @@ public:
     void drawPopupMenuBackground(juce::Graphics &, int w, int h) override;
 };
 
-void drawPanel(juce::Graphics &, juce::Rectangle<float> r);
+void drawPanel(juce::Graphics &, juce::Rectangle<float> r, float sc);   /* sc: the screen's pixels per unit (not scaled yet) */
+juce::Rectangle<float> plateArea(juce::Rectangle<float> r);
 void drawSection(juce::Graphics &, juce::Rectangle<float> r, const juce::String &title);
 void drawSub(juce::Graphics &, juce::Rectangle<float> r, const juce::String &title);   /* a part of a section */
 /* a knob: pos 0..1; morph: where the morph takes it (-1: none shown); scale: the printed 0-10 */
 void drawKnob(juce::Graphics &, juce::Rectangle<float> r, float pos, bool redCap, bool scale, float morphTo,
               bool bipolar);
 void drawEndless(juce::Graphics &, juce::Rectangle<float> r, float angle);
-void drawKey(juce::Graphics &, juce::Rectangle<float> r, bool down);
+void drawKey(juce::Graphics &, juce::Rectangle<float> r, bool down, bool grey = false);
 void drawLed(juce::Graphics &, juce::Point<float> c, float r, float level, juce::Colour on = col::led);
-void drawDisplay(juce::Graphics &, juce::Rectangle<float> r, const juce::String &text, int ghost);
+void drawDisplay(juce::Graphics &, juce::Rectangle<float> r, const juce::String &text, int cells);   /* 7 segments */
 void drawLcd(juce::Graphics &, juce::Rectangle<float> r);
 void drawLabel(juce::Graphics &, const juce::String &, juce::Rectangle<float>, float size = 11.0f,
                juce::Justification j = juce::Justification::centred, juce::Colour c = col::print);

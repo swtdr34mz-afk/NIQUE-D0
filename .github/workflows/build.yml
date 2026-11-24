@@ -32,7 +32,7 @@ jobs:
         include:
           - os: windows-latest
             name: Windows
-          - os: macos-latest
+          - os: macos-14
             name: macOS
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90

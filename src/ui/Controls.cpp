@@ -400,7 +400,7 @@ void ActionKey::paint(Graphics &g)
         drawLed(g, r.removeFromTop(12.0f).getCentre(), 3.6f, led());
     if (legend == "<" || legend == ">") {  /* an arrow on the key */
         auto k = Rectangle<float>(jmin(r.getWidth() - 2.0f, 44.0f), jmin(r.getHeight() - 4.0f, 22.0f)).withCentre(r.getCentre());
-        drawKey(g, k, down);
+        drawKey(g, k, down, true);
         auto c = k.getCentre().translated(0.0f, down ? 1.0f : 0.0f);
         float d = legend == ">" ? 1.0f : -1.0f;
         Path t;
@@ -413,7 +413,7 @@ void ActionKey::paint(Graphics &g)
     if (legend.isNotEmpty())
         lab = legendAbove ? r.removeFromTop(15.0f) : r.removeFromBottom(15.0f);
     auto k = Rectangle<float>(jmin(r.getWidth() - 2.0f, 44.0f), jmin(r.getHeight() - 4.0f, 20.0f)).withCentre(r.getCentre());
-    drawKey(g, k, down);
+    drawKey(g, k, down, true);
     if (legend.isNotEmpty())
         drawLabel(g, legend, lab.expanded(10.0f, 0.0f), 10.5f);
 }
