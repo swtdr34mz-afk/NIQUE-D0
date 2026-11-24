@@ -33,6 +33,11 @@ One synth part with 24 voices (in a DAW: one instance per part, instead of the A
   **LIKE** keeps the sound as it is now (up to 50, kept with the project); the arrows go back to them.
   **INIT** starts from a plain saw. **STORE** saves your own presets (Documents/NIQUE D0/Presets).
 
+**Sound:** the voices run at 4 times the host's rate (OVERSAMPLING: 2x light on the CPU, 4x, 8x for the final
+mix; half that from 88.2 kHz up), down through half-band filters. Each voice drifts a few cents and has its own
+tuning and filter offset, the envelopes attack like a charging capacitor, the ladders self-oscillate (the diode
+ladder never), and every knob move is smoothed. The effects read their delay lines with cubic interpolation.
+
 57 factory programs: leads, basses, pads, strings, brass, keys, organs, bells, plucks, voices, arpeggios, effects.
 
 ## Installing on the Mac

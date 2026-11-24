@@ -172,6 +172,10 @@ for e, n, s in MORPH:
     if e not in WHEEL_ONLY:
         P("MV_" + e, "mv_" + e.lower(), "MORPH VELOCITY " + n, "MV " + s, "K_BIP", default=0.5)
 
+# the voices' oversampling (2, 4 or 8 times the host's rate, half that from 88.2 kHz up)
+CH("CH_QUALITY", ["2X", "4X", "8X"])
+P("QUALITY", "quality", "OVERSAMPLING", "Quality", "K_CH", "CH_QUALITY", default=1)
+
 # -------------------------------------------------------------------------------------------------- output ---
 ids = [r[1] for r in rows]
 assert len(ids) == len(set(ids))

@@ -13,16 +13,16 @@ namespace nq
 {
 namespace
 {
-constexpr int NV = 24;                   /* the voices */
+constexpr int NV = 64;                   /* the voices (unison takes from these, not from the notes) */
 constexpr int BLOCK = 16;                /* host samples a control step */
-constexpr int MAXOS = 2;
+constexpr int MAXOS = 8;
 
 enum Stage { ST_OFF, ST_ATT, ST_DEC, ST_SUS, ST_REL };
 
 /* an ADR / ASR envelope: a linear attack, then an exponential decay to nothing (or held: SUST), the release */
 struct Env {
     int st = ST_OFF;
-    float lev = 0.0f, attInc = 1.0f, decK = 0.999f, relK = 0.99f;
+    float lev = 0.0f, attK = 1.0f, decK = 0.999f, relK = 0.99f;
     bool sus = false, freeAtZero = false;
     void on() { st = ST_ATT; }
     void off()
@@ -33,8 +33,8 @@ struct Env {
     float tick()
     {
         switch (st) {
-        case ST_ATT:
-            lev += attInc;
+        case ST_ATT:                     /* a capacitor charging towards more than the top: an analogue attack */
+            lev += (1.35f - lev) * attK;
             if (lev >= 1.0f) {
                 lev = 1.0f;
                 st = sus ? ST_SUS : ST_DEC;
@@ -98,41 +98,73 @@ struct Voice {
     float lfoT = 0.0f, lfoSH = 0.0f;     /* the LFO's envelope mode: time since the note, its random value */
     float age_s = 0.0f;                  /* seconds since the note (delayed vibrato) */
     float s[4] = {}, a1 = 0.0f, a2 = 0.0f, b1 = 0.0f, b2 = 0.0f, hpz = 0.0f;   /* the filters' states */
+    float drift = 0.0f, tuneOff = 0.0f, cutOff = 0.0f;   /* the analogue in it: a slow wander, its own tuning, its own filter */
     Rng rng;
 };
 
-/* 2x down: a half-band FIR (55 taps, Blackman-Harris) */
-struct Decimator {
-    static constexpr int N = 55, C = 27;
-    float h[N] = {};
-    float x[64] = {};
+/* 2x down: a half-band FIR (Blackman-Harris windowed); the last stage long (sharp at the top of the audio band),
+ * the earlier ones short (their images lie far above it) */
+struct Halfband {
+    static constexpr int MAXN = 63;
+    int n = 63, c = 31;
+    float h[MAXN] = {};
+    float x[128] = {};
     int w = 0;
-    void design()
+    void design(int taps)
     {
+        n = taps;
+        c = taps / 2;
         double sum = 0.0;
-        for (int k = 0; k < N; k++) {
-            double m = k - C;
+        for (int k = 0; k < n; k++) {
+            double m = k - c;
             double sinc = m == 0 ? 1.0 : std::sin(3.14159265358979 * 0.5 * m) / (3.14159265358979 * 0.5 * m);
-            double t = 2.0 * 3.14159265358979 * k / (N - 1);
+            double t = 2.0 * 3.14159265358979 * k / (n - 1);
             double win = 0.35875 - 0.48829 * std::cos(t) + 0.14128 * std::cos(2 * t) - 0.01168 * std::cos(3 * t);
             h[k] = (float)(sinc * win);
             sum += h[k];
         }
-        for (float &c : h)
-            c = (float)(c / sum);
+        for (int k = 0; k < n; k++)
+            h[k] = (float)(h[k] / sum);
     }
     void clear() { std::fill(std::begin(x), std::end(x), 0.0f); }
-    float run(float a, float b)          /* two in, one out */
+    float run(float a, float b)          /* two in, one out (the odd taps are zero but the centre's) */
     {
         x[w] = a;
-        w = (w + 1) & 63;
+        w = (w + 1) & 127;
         x[w] = b;
-        w = (w + 1) & 63;
-        float y = 0.0f;
-        int r = w - 1;
-        for (int k = 0; k < N; k++)
-            y += h[k] * x[(r - k) & 63];
+        w = (w + 1) & 127;
+        const int r = w - 1;
+        float y = h[c] * x[(r - c) & 127];
+        for (int k = 0; k < n; k += 2)
+            y += h[k] * x[(r - k) & 127];
         return y;
+    }
+};
+
+/* down by 1, 2, 4 or 8 */
+struct Decimator {
+    Halfband st[3];
+    int stages = 1;
+    void design(int factor)
+    {
+        stages = factor >= 8 ? 3 : factor >= 4 ? 2 : factor >= 2 ? 1 : 0;
+        for (int k = 0; k < stages; k++)   /* the last stage: 63 taps; before it 23, 15 */
+            st[k].design(k == stages - 1 ? 63 : (k == stages - 2 ? 23 : 15));
+        clear();
+    }
+    void clear()
+    {
+        for (auto &h : st)
+            h.clear();
+    }
+    void run(float *buf, int n, float *out)   /* n in (the factor times the out), in place */
+    {
+        for (int k = 0; k < stages; k++) {
+            n /= 2;
+            for (int i = 0; i < n; i++)
+                buf[i] = st[k].run(buf[2 * i], buf[2 * i + 1]);
+        }
+        std::copy(buf, buf + n, out);
     }
 };
 
@@ -185,6 +217,8 @@ struct Impl {
     float outL[BLOCK] = {}, outR[BLOCK] = {};
     int outPos = BLOCK;
     Decimator dec[2];
+    int quality = -1;                    /* the QUALITY the factor was set for */
+    float dcx[2] = {}, dcy[2] = {}, dcR = 0.9987f;
     FxUnit fx;
     DelayUnit dly;
     ReverbUnit rev;
@@ -260,6 +294,8 @@ struct Impl {
             for (float &s : x.s)
                 s = 0.0f;
             x.a1 = x.a2 = x.b1 = x.b2 = x.hpz = 0.0f;
+            x.tuneOff = 0.006f * x.rng.bi();   /* (a voice's own: under a cent, a few percent of the cutoff) */
+            x.cutOff = 0.04f * x.rng.bi();
             x.amp.lev = x.mod.lev = 0.0f;
         }
         if (retrigger || fresh) {
@@ -556,6 +592,8 @@ struct Impl {
     /* -------------------------------------------------------------------------------- the control step --- */
     void block()
     {
+        if (ch(QUALITY) != quality)        /* the oversampling changed: a new factor from the next sample on */
+            setOversampling();
         const int m = BLOCK * os;
         const float dtBlock = (float)BLOCK / (float)sr;
         wheelS += (wheelT - wheelS) * std::min(1.0f, dtBlock / 0.012f);
@@ -612,16 +650,15 @@ struct Impl {
         mVoices = sounding;
 
         float bl[BLOCK], br[BLOCK];
-        if (os == 2)
-            for (int i = 0; i < BLOCK; i++) {
-                bl[i] = dec[0].run(osL[2 * i], osL[2 * i + 1]);
-                br[i] = dec[1].run(osR[2 * i], osR[2 * i + 1]);
-            }
-        else
-            for (int i = 0; i < BLOCK; i++) {
-                bl[i] = osL[i];
-                br[i] = osR[i];
-            }
+        dec[0].run(osL, m, bl);
+        dec[1].run(osR, m, br);
+        for (int i = 0; i < BLOCK; i++) {  /* below the audible: out (a 10 Hz high-pass) */
+            float yl = bl[i] - dcx[0] + dcR * dcy[0], yr = br[i] - dcx[1] + dcR * dcy[1];
+            dcx[0] = bl[i];
+            dcx[1] = br[i];
+            dcy[0] = bl[i] = yl;
+            dcy[1] = br[i] = yr;
+        }
 
         fx.process(bl, br, BLOCK, ch(FX_TYPE), eff(FX_AMT, 0.0f), sw(FX_ON));
         float pan = val[OUT_PAN];        /* (the balance; the level is the voices') */
@@ -654,6 +691,19 @@ struct Impl {
         mOut = peak;
     }
 
+    void setOversampling()
+    {
+        quality = std::min(2, std::max(0, ch(QUALITY)));
+        int f = 2 << quality;            /* 2, 4, 8 */
+        if (sr >= 70000.0)               /* (at 88.2 kHz and up: half as many) */
+            f /= 2;
+        os = std::min(MAXOS, std::max(1, f));
+        fsI = (float)(sr * os);
+        dcR = 1.0f - 62.83f / (float)sr;
+        dec[0].design(os);
+        dec[1].design(os);
+    }
+
     void panic()
     {
         allNotesOff();
@@ -676,13 +726,14 @@ struct Impl {
         /* the envelopes' rates for this step */
         auto per = [fs](float sec) { return std::exp(-6.9078f / std::max(1.0f, sec * fs)); };
         float aA = eff(AENV_A, vel), aD = eff(AENV_D, vel), aR = eff(AENV_R, vel);
-        x.amp.attInc = 1.0f / std::max(1.0f, map::ampAttack(aA) * fs);
+        auto att = [fs](float sec) { return 1.0f - std::exp(-1.35f / std::max(1.0f, sec * fs)); };
+        x.amp.attK = att(map::ampAttack(aA));
         x.amp.sus = map::isSustain(aD);
         x.amp.decK = per(map::ampDecay(aD));
         x.amp.relK = per(map::release(aR));
         x.amp.freeAtZero = true;
         float mA = eff(MENV_A, vel), mD = eff(MENV_D, vel), mR = eff(MENV_R, vel);
-        x.mod.attInc = 1.0f / std::max(1.0f, map::modAttack(mA) * fs);
+        x.mod.attK = att(map::modAttack(mA));
         x.mod.sus = map::isSustain(mD);
         x.mod.decK = per(map::modDecay(mD));
         x.mod.relK = per(map::release(mR));
@@ -710,7 +761,9 @@ struct Impl {
             }
             vib = depth * fsin01(vibPh);
         }
-        float semis = x.pitch + 12.0f * (float)(ch(OCTAVE) - 2) + bend + x.detune + vib;
+        /* the analogue wander: a slow random walk of a few cents, each voice its own */
+        x.drift += (x.rng.bi() - x.drift) * std::min(1.0f, dtBlock * 1.2f);
+        float semis = x.pitch + 12.0f * (float)(ch(OCTAVE) - 2) + bend + x.detune + vib + x.tuneOff + 0.04f * x.drift;
 
         /* the oscillators */
         const int wv = std::min(46, std::max(0, ch(OSC_WAVE)));
@@ -747,7 +800,7 @@ struct Impl {
         float menv0 = x.mod.lev * envSign;
         float ctrl0 = clampf(ctrl + oEnv * menv0, 0.0f, 1.0f);
         float fTab = f0 * W.freqMul;
-        WaveReader r1, r2, rs;
+        WaveReader r1w, r2, rs;
         float levelF = fTab;
         if (kind == C_SHAPE)
             levelF *= 1.0f + 4.0f * ctrl0;
@@ -759,7 +812,7 @@ struct Impl {
         }
         else if (kind == C_PITCH)
             levelF *= fexp2((map::pitchSemis(ctrl0) + 48.0f * oEnv * oEnv * std::max(0.0f, menv0)) / 12.0f);
-        r1.set(W, waveLevel(levelF, fs));
+        r1w.set(W, waveLevel(levelF, fs));
         if (kind == C_SHAPE && wv == 0)
             rs.set(wave(1), waveLevel(f0, fs));
         if (kind == C_MIX)
@@ -773,29 +826,46 @@ struct Impl {
         /* the filter */
         const int ft = std::min(5, std::max(0, ch(FLT_TYPE)));
         static const float KB[4] = {0.0f, 1.0f / 3.0f, 2.0f / 3.0f, 1.0f};
-        float cutBase = std::log2(map::filterHz(eff(FLT_FREQ, vel))) + KB[std::min(3, std::max(0, ch(FLT_KB)))] *
-                                                                            (x.pitch - 60.0f) / 12.0f;
-        float fEnv = eff(FLT_MENV, vel) * 8.0f, fLfo = eff(FLT_LFO, vel);
+        const float cutNew = std::log2(map::filterHz(eff(FLT_FREQ, vel))) + x.cutOff +
+                             KB[std::min(3, std::max(0, ch(FLT_KB)))] * (x.pitch - 60.0f) / 12.0f;
+        const float cutPrev = x.cutLog < 0.0f ? cutNew : x.cutLog;   /* (ramped over the step: no steps heard) */
+        x.cutLog = cutNew;
+        const float fEnv = eff(FLT_MENV, vel) * 8.0f;
+        float fLfo = eff(FLT_LFO, vel);
         fLfo = fLfo * fLfo * 6.0f;
-        float res = eff(FLT_RES, vel), drive = eff(FLT_DRIVE, vel);
-        const float cutMax = std::log2(0.44f * fs), cutMin = std::log2(14.0f);
-        const float kSvf = 2.0f * (1.0f - 0.985f * res);
-        const float kLad = ft == 2 ? 4.15f * res : 3.95f * res;
-        float lvl = map::level(eff(OUT_LEVEL, vel));
-        float velGain = sw(AENV_VEL) ? 0.12f + 0.88f * std::pow(vel, 1.3f) : 1.0f;
-        float gainL = 0.42f * lvl * velGain * x.gl, gainR = 0.42f * lvl * velGain * x.gr;
-        float dGain = 1.0f + 9.0f * drive * drive, dComp = (1.0f + drive) / (1.0f + 2.5f * drive);
+        const float res = eff(FLT_RES, vel), drive = eff(FLT_DRIVE, vel);
+        const float cutMax = std::log2(0.42f * fs), cutMin = std::log2(14.0f);
+        /* the resonance: the state-variable ones to the edge of oscillation, the ladders past it (self-oscillating,
+         * held by their saturation); the diode ladder never, and weaker down low */
+        const float r1 = 1.0f - res;
+        const float r12 = res * res * res * res;
+        const float kSvf = 2.0f * r1 * (1.0f - 0.15f * res) - 0.04f * r12 * r12 * r12;   /* (just under 0 at the top) */
+        const float kNorm = std::max(kSvf, 0.12f);   /* (BP's level: the peak's, but not to nothing as it rings) */
+        const float kLad = ft == 2 ? 4.3f * res : 4.12f * res;
+        const float lvl = map::level(eff(OUT_LEVEL, vel));
+        const float velGain = sw(AENV_VEL) ? 0.12f + 0.88f * std::pow(vel, 1.3f) : 1.0f;
+        const float gainL = 0.42f * lvl * velGain * x.gl, gainR = 0.42f * lvl * velGain * x.gr;
+        const float dGain = 1.0f + 9.0f * drive * drive, dComp = (1.0f + drive) / (1.0f + 2.5f * drive);
+        const int lw = ch(LFO_WAVE);
+        const bool pitchMod = kind == C_PITCH && (oLfo > 0.0f || oEnv > 0.0f);
+        const float pitchInc = fTab * fexp2(map::pitchSemis(ctrl) / 12.0f) / fs;
+        const float rfs = 1.0f / fs;
+        const int cstep = std::max(1, os / 2);   /* the filter's coefficients: every 1-4 samples (at most 2x the host's) */
+        const float invM = 1.0f / (float)m;
 
         float sh = x.lfoSH;
         float *L = osL, *R = osR;
+        /* the filter's coefficients, kept between their updates */
+        float g = 0.1f, A1 = 1.0f, A2 = 0.0f, A3 = 0.0f, B1 = 1.0f, B2 = 0.0f, B3 = 0.0f, G = 0.1f, G2 = 0.0f, G3 = 0.0f,
+              G4 = 0.0f, kTb = 0.0f;
         for (int i = 0; i < m; i++) {
             float menv = x.mod.tick() * envSign;
             float a = x.amp.tick();
             float lfo;
             if (lfoEnvMode) {            /* the LFO as an envelope of this voice */
                 float p = x.lfoT / lfoTime;
-                x.lfoT += 1.0f / fs;
-                switch (ch(LFO_WAVE)) {
+                x.lfoT += rfs;
+                switch (lw) {
                 case 0: lfo = p < 1.0f ? 1.0f : 0.0f; break;
                 case 1: lfo = std::max(0.0f, 1.0f - p); break;
                 case 2: lfo = std::min(1.0f, p); break;
@@ -807,14 +877,16 @@ struct Impl {
             } else
                 lfo = lfoBip ? lfoB[i] : lfoU[i];
 
-            const float rfs = 1.0f / fs;
             float y, c = clampf(ctrl + oLfo * oLfo * lfo + oEnv * menv, 0.0f, 1.0f);
             switch (kind) {
             case C_PITCH: {
-                float s = map::pitchSemis(ctrl) + 24.0f * oLfo * oLfo * lfo + 48.0f * oEnv * oEnv * menv;
-                x.ph1 += fTab * fexp2(s / 12.0f) * rfs;
+                if (pitchMod) {
+                    float s = map::pitchSemis(ctrl) + 24.0f * oLfo * oLfo * lfo + 48.0f * oEnv * oEnv * menv;
+                    x.ph1 += fTab * fexp2(s / 12.0f) * rfs;
+                } else
+                    x.ph1 += pitchInc;
                 x.ph1 -= std::floor(x.ph1);
-                y = r1(x.ph1);
+                y = r1w(x.ph1);
                 break;
             }
             case C_SHAPE: {
@@ -825,13 +897,13 @@ struct Impl {
                     float w = 0.5f - 0.46f * c;
                     y = rs(p) - rs(p + w);
                 } else if (wv == 1)      /* the saw and a second one sliding to the octave */
-                    y = 0.5f * (r1(p) + r1(p + 0.5f * c)) * (1.0f + 0.5f * c);
+                    y = 0.5f * (r1w(p) + r1w(p + 0.5f * c)) * (1.0f + 0.5f * c);
                 else if (wv == 2 || wv == 3)   /* folded */
-                    y = fold(r1(p) * (1.0f + 5.0f * c));
+                    y = fold(r1w(p) * (1.0f + 5.0f * c));
                 else {                   /* phase distortion */
                     float k = 0.5f - 0.45f * c;
                     float q = p < k ? 0.5f * p / k : 0.5f + 0.5f * (p - k) / (1.0f - k);
-                    y = r1(q);
+                    y = r1w(q);
                 }
                 break;
             }
@@ -840,8 +912,8 @@ struct Impl {
                 x.ph3 += inc;
                 x.ph3 -= std::floor(x.ph3);
                 float s = frac(x.ph3 * ratio);
-                float h = r1(0.0f) - r1(frac(ratio));
-                y = r1(s) + 0.5f * h * blep(x.ph3, inc);
+                float h = r1w(0.0f) - r1w(frac(ratio));
+                y = r1w(s) + 0.5f * h * blep(x.ph3, inc);
                 break;
             }
             case C_DETUNE: {
@@ -849,7 +921,7 @@ struct Impl {
                 x.ph1 -= std::floor(x.ph1);
                 x.ph2 += inc2;
                 x.ph2 -= std::floor(x.ph2);
-                y = 0.65f * (r1(x.ph1) + r1(x.ph2));
+                y = 0.65f * (r1w(x.ph1) + r1w(x.ph2));
                 break;
             }
             case C_MIX: {
@@ -857,7 +929,7 @@ struct Impl {
                 if (x.pm >= 8.0f)
                     x.pm -= 8.0f;
                 float p1 = frac(2.0f * x.pm * W.freqMul), p2 = frac(2.0f * mixH * x.pm);
-                y = (r1(p1) + c * r2(p2)) / (1.0f + 0.5f * c);
+                y = (r1w(p1) + c * r2(p2)) / (1.0f + 0.5f * c);
                 break;
             }
             case C_FM: {
@@ -865,7 +937,7 @@ struct Impl {
                 x.ph1 -= std::floor(x.ph1);
                 x.ph2 += f0 * fmRatio * rfs;
                 x.ph2 -= std::floor(x.ph2);
-                y = r1(x.ph1 + map::fmIndex(c) * 0.15915f * fsin01(x.ph2));
+                y = r1w(x.ph1 + map::fmIndex(c) * 0.15915f * fsin01(x.ph2));
                 break;
             }
             case C_AM: {
@@ -873,76 +945,95 @@ struct Impl {
                 x.ph1 -= std::floor(x.ph1);
                 x.ph2 += f0 * map::amRatio(c) * rfs;
                 x.ph2 -= std::floor(x.ph2);
-                y = r1(x.ph1) * fsin01(x.ph2);
+                y = r1w(x.ph1) * fsin01(x.ph2);
                 break;
             }
             default: {
                 x.ph1 += fTab * rfs;
                 x.ph1 -= std::floor(x.ph1);
-                y = r1(x.ph1) * (1.0f - c) + x.rng.bi() * c * 0.8f;
+                y = r1w(x.ph1) * (1.0f - c) + x.rng.bi() * c * 0.8f;
                 break;
             }
             }
 
-            /* the filter */
-            float cl = clampf(cutBase + fEnv * menv + fLfo * (lfoBip ? 0.5f * (lfo + 1.0f) : lfo), cutMin, cutMax);
-            float g = ftan(std::min(1.45f, PI * fexp2(cl) / fs));
+            /* the filter: its coefficients every few samples, the cutoff ramped across the step */
+            if (i % cstep == 0) {
+                float cb = cutPrev + (cutNew - cutPrev) * ((float)i * invM);
+                float cl = clampf(cb + fEnv * menv + fLfo * (lfoBip ? 0.5f * (lfo + 1.0f) : lfo), cutMin, cutMax);
+                g = ftan(std::min(1.45f, PI * fexp2(cl) * rfs));
+                if (ft == 0 || ft == 4 || ft == 5) {
+                    A1 = 1.0f / (1.0f + g * (g + kSvf));
+                    A2 = g * A1;
+                    A3 = g * A2;
+                    float k2 = ft == 4 ? std::max(kSvf, 0.004f) : 1.41421356f;
+                    B1 = 1.0f / (1.0f + g * (g + k2));
+                    B2 = g * B1;
+                    B3 = g * B2;
+                } else {
+                    G = g / (1.0f + g);
+                    G2 = G * G;
+                    G3 = G2 * G;
+                    G4 = G2 * G2;
+                    if (ft == 3)         /* the diode ladder: less resonance down low */
+                        kTb = 3.3f * res * clampf((cl - 6.3f) / 3.3f, 0.25f, 1.0f);
+                }
+            }
             float in = y * 0.85f;
             float out;
             if (ft == 0 || ft == 4 || ft == 5) {   /* the state-variable ones: LP12, BP, HP */
-                float k = kSvf;
-                float A1 = 1.0f / (1.0f + g * (g + k)), A2 = g * A1, A3 = g * A2;
+                const float k = kSvf;
                 float xin = ftanh(in);
                 float v3 = xin - x.a2, v1 = A1 * x.a1 + A2 * v3, v2 = x.a2 + A2 * x.a1 + A3 * v3;
                 x.a1 = 2.0f * v1 - x.a1;
                 x.a2 = 2.0f * v2 - x.a2;
+                x.a1 = 3.0f * ftanh(x.a1 * 0.3333f);   /* (the band's state saturates: oscillation held, not runaway) */
                 float lp = v2, bp = v1, hp = xin - k * v1 - v2;
                 if (ft == 0)
                     out = lp;
                 else {                   /* a second stage: 12 dB each side (BP), 24 dB (HP) */
-                    float k2 = ft == 4 ? k : 1.41421356f;
-                    float in2 = ft == 4 ? bp * k : hp;
-                    float B1 = 1.0f / (1.0f + g * (g + k2)), B2 = g * B1, B3 = g * B2;
+                    float k2 = ft == 4 ? std::max(k, 0.004f) : 1.41421356f;
+                    float in2 = ft == 4 ? bp * kNorm : hp;
                     float w3 = in2 - x.b2, w1 = B1 * x.b1 + B2 * w3, w2 = x.b2 + B2 * x.b1 + B3 * w3;
                     x.b1 = 2.0f * w1 - x.b1;
                     x.b2 = 2.0f * w2 - x.b2;
-                    out = ft == 4 ? w1 * k2 : in2 - k2 * w1 - w2;
+                    out = ft == 4 ? w1 * kNorm : in2 - k2 * w1 - w2;
                 }
             } else {                     /* the ladders: LP24, LP M (transistor), LP TB (diode) */
-                float G = g / (1.0f + g), be = 1.0f - G;
-                float G2 = G * G, G3 = G2 * G, G4 = G2 * G2;
+                const float be = 1.0f - G;
                 float S = G3 * be * x.s[0] + G2 * be * x.s[1] + G * be * x.s[2] + be * x.s[3];
-                float k = kLad;
-                if (ft == 3) {           /* the diode ladder: less resonance down low, never self-oscillating */
-                    float t = clampf((cl - 6.3f) / 3.3f, 0.25f, 1.0f);
-                    k = 3.3f * res * t;
+                float k = ft == 3 ? kTb : kLad;
+                if (ft == 3)
                     S -= x.hpz;
-                }
                 float u = (in - k * S) / (1.0f + k * G4);
-                u = ftanh(u);
-                float y1, y2, y3, y4;
-                auto stage = [G](float xi, float &s) {
-                    float vv = (xi - s) * G;
-                    float yy = vv + s;
-                    s = yy + vv;
+                auto stage = [G](float xi, float &st) {
+                    float vv = (xi - st) * G;
+                    float yy = vv + st;
+                    st = yy + vv;
                     return yy;
                 };
+                float y1, y2, y3, y4;
                 if (ft == 2) {           /* the transistor ladder: each stage a little saturated */
+                    u = ftanh(u);
                     y1 = stage(u, x.s[0]);
                     y2 = stage(ftanh(y1), x.s[1]);
                     y3 = stage(ftanh(y2), x.s[2]);
                     y4 = stage(ftanh(y3), x.s[3]);
-                    out = y4 * (1.0f + 0.45f * k);
-                } else {
+                    out = y4 * (1.0f + 0.5f * k);   /* (its lows kept under the resonance) */
+                } else if (ft == 3) {    /* the diode ladder: uneven (warm), a touch of 3 poles in it */
+                    u = ftanh(1.15f * u + 0.04f) - 0.04f;
                     y1 = stage(u, x.s[0]);
                     y2 = stage(y1, x.s[1]);
                     y3 = stage(y2, x.s[2]);
                     y4 = stage(y3, x.s[3]);
-                    if (ft == 3) {
-                        x.hpz += 0.012f * (y4 - x.hpz);
-                        out = (0.75f * y4 + 0.3f * y3) * (1.0f + 0.3f * k);
-                    } else
-                        out = y4;
+                    x.hpz += 0.012f * (y4 - x.hpz);
+                    out = (0.75f * y4 + 0.3f * y3) * (1.0f + 0.3f * k);
+                } else {                 /* the plain ladder: clean, its lows thinning with the resonance */
+                    u = ftanh(u);
+                    y1 = stage(u, x.s[0]);
+                    y2 = stage(y1, x.s[1]);
+                    y3 = stage(y2, x.s[2]);
+                    y4 = stage(y3, x.s[3]);
+                    out = y4 * (1.0f + 0.15f * k);
                 }
             }
             if (drive > 0.001f)
@@ -951,7 +1042,6 @@ struct Impl {
             R[i] += out * a * gainR;
         }
         x.inc1 = f0;
-        x.cutLog = cutBase;
         if (x.amp.st == ST_OFF) {
             x.on = false;
             x.gate = false;
@@ -970,10 +1060,7 @@ void Engine::prepare(double sampleRate)
     std::copy(d->val, d->val + NPARAMS, keep->val);
     d = std::move(keep);
     d->sr = sampleRate > 1000.0 ? sampleRate : 44100.0;
-    d->os = d->sr < 70000.0 ? 2 : 1;
-    d->fsI = (float)(d->sr * d->os);
-    d->dec[0].design();
-    d->dec[1].design();
+    d->setOversampling();
     d->fx.prepare((float)d->sr);
     d->dly.prepare((float)d->sr);
     d->rev.prepare((float)d->sr);
