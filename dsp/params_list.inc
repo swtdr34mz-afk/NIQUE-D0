@@ -101,3 +101,4 @@ P(MV_AENV_A, "mv_aenv_a", "MORPH VELOCITY AMP ENV ATTACK", "MV AEnvA", K_BIP, 0,
 P(MV_AENV_D, "mv_aenv_d", "MORPH VELOCITY AMP ENV DECAY", "MV AEnvD", K_BIP, 0, 0.5f)
 P(MV_AENV_R, "mv_aenv_r", "MORPH VELOCITY AMP ENV RELEASE", "MV AEnvR", K_BIP, 0, 0.5f)
 P(MV_OUT_LEVEL, "mv_out_level", "MORPH VELOCITY OUTPUT LEVEL", "MV Level", K_BIP, 0, 0.5f)
+P(QUALITY, "quality", "OVERSAMPLING", "Quality", K_CH, CH_QUALITY, 1.0f)

@@ -58,7 +58,7 @@ void FxUnit::process(float *l, float *r, int n, int type, float amt, bool on)
                 float ph = lfoA + 0.25f * (float)c;
                 float tri = std::fabs(2.0f * (ph - std::floor(ph)) - 1.0f);
                 float d = (0.3f + 3.7f * tri * tri) * 0.001f * sr;
-                float y = dl[c].read(d);
+                float y = dl[c].read3(d);
                 dl[c].push(in[c] + fb[c] * 0.7f);
                 fb[c] = y;
                 wet[c] = 0.5f * (in[c] + y);
@@ -100,7 +100,7 @@ void FxUnit::process(float *l, float *r, int n, int type, float amt, bool on)
             for (int c = 0; c < 2; c++) {
                 float s = fsin01(lfoA + 0.5f * (float)c);
                 dl[c].push(in[c]);
-                float y = dl[c].read(base + depth * (0.5f + 0.5f * s));
+                float y = dl[c].read3(base + depth * (0.5f + 0.5f * s));
                 float mix = 0.3f + 0.3f * a;
                 wet[c] = in[c] * (1.0f - mix) + y * mix * 1.2f;
             }
@@ -118,7 +118,7 @@ void FxUnit::process(float *l, float *r, int n, int type, float amt, bool on)
                 for (int k = 0; k < 3; k++) {
                     float off = (float)k / 3.0f + (c ? 0.5f / 3.0f : 0.0f);
                     float d = base + slow * (0.5f + 0.5f * fsin01(lfoA + off)) + fast * (0.5f + 0.5f * fsin01(lfoB + off));
-                    y += dl[c].read(d);
+                    y += dl[c].read3(d);
                 }
                 float mix = 0.35f + 0.35f * a;
                 wet[c] = in[c] * (1.0f - mix) + y * 0.45f * mix;

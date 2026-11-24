@@ -110,7 +110,7 @@ struct NiqueEditor::Header : Component {
     Rectangle<float> num() const { return {330.0f, 16.0f, 64.0f, 32.0f}; }
     Rectangle<float> name() const { return {404.0f, 16.0f, 250.0f, 32.0f}; }
     Rectangle<float> likeNum() const { return {872.0f, 16.0f, 70.0f, 32.0f}; }
-    Rectangle<float> read() const { return {1330.0f, 16.0f, 494.0f, 32.0f}; }
+    Rectangle<float> read() const { return {1420.0f, 16.0f, 404.0f, 32.0f}; }
     bool edited = false;
     void paint(Graphics &g) override
     {
@@ -207,6 +207,14 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     tool("MUTATE", [this](const ModifierKeys &) { proc.mutate(ui.morph); }, 1084, 66);
     tool("RANDOM", [this](const ModifierKeys &) { proc.randomize(ui.morph); }, 1154, 66);
     tool("PANIC", [this](const ModifierKeys &) { proc.panicRequest = true; }, 1238, 64);
+    {                                    /* the voices' oversampling: 2, 4 or 8 times (click: the list) */
+        auto *q = add(new Endless(a, "quality", ui, [](int c) { return String(2 << c); },
+                                  [](int c) { return String(2 << c) + "x oversampling" + (c == 0 ? " (light on the CPU)" : c == 1 ? " (the default)" : " (for the final mix)"); }),
+                      {1318, 6, 92, 52});
+        q->knob = false;
+        q->ghost = 1;
+        q->legend = "OVERSAMPLING";
+    }
 
     /* ------------------------------------------------------- MORPH, the octave, HOLD, the wheels --- */
     section({12, 72, 176, 476}, "MORPH");
