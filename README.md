@@ -18,10 +18,8 @@ One synth part with 24 voices (in a DAW: one instance per part, instead of the A
   low), BP, HP; FREQ, RESONANCE, DRIVE, KB TRACK (off, 1/3, 2/3, 1), LFO AMT, MODENV AMT.
 - **MOD ENV / AMP ENV:** attack, decay, release; the decay at its end holds (ASR). INVERT and VEL for the mod
   envelope, VEL for the amp envelope.
-- **LFO 1:** square, saw, inverted saw, triangle, S/H; MST CLK (the DAW's tempo, 4 bars to 1/64, triplets);
-  ENVELOPE: once per note, per voice. It drives the oscillators' and the filter's LFO AMT.
-- **LFO 2, 3, 4:** each with its own RATE (or MST CLK), waveform, DESTINATION (PITCH, OSC CTRL, FILTER, RESONANCE,
-  DRIVE, AMP, PAN) and AMOUNT.
+- **LFO:** square, saw, inverted saw, triangle, S/H; MST CLK (the DAW's tempo, 4 bars to 1/64, triplets);
+  ENVELOPE: once per note, per voice. Its amount is set in the oscillators (LFO AMT) and the filter (LFO AMT).
 - **VOICE MODE:** poly, mono, legato, UNISON 1–3, GLIDE, BEND RANGE (to 48 semitones, or +2/-12, +2/-24).
   **VIBRATO:** DLY 1, DLY 2 (starting after 0.5 / 1 s) or WHEEL, its RATE and AMOUNT.
 - **ARPEGGIATOR:** RUN, RATE (or MST CLK: 1/2 to 1/32, triplets), RANGE 1–4 octaves, up, down, up/down, random.

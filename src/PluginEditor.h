@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 swtdr34mz (NIQUE D0) */
-/* The panel: every section laid out on a page of 1840 x 770, scaled to the window. On top the logo, the program,
+/* The panel: every section laid out on a page of 1840 x 600, scaled to the window. On top the logo, the program,
  * LIKE, the sound's tools and the readout of the control in hand; on the left the morphs, the octave, HOLD, the
  * pitch stick and the mod wheel. */
 #pragma once
@@ -10,7 +10,7 @@
 class NiqueEditor : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
-    static constexpr int W = 1840, H = 770;
+    static constexpr int W = 1840, H = 600;
     explicit NiqueEditor(NiqueProcessor &);
     ~NiqueEditor() override;
     void resized() override;

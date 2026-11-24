@@ -303,45 +303,6 @@ int main(int argc, char **argv)
         CHECK(e.voicesSounding() == 1, "mono: %d voices", e.voicesSounding());
     }
 
-    /* LFO 2, 3, 4: every waveform to every destination moves the sound */
-    {
-        int still = 0;
-        for (int n = 0; n < 3; n++)
-            for (int d = 0; d < 7; d++) {
-                float peak[2];
-                std::vector<float> outs[2];
-                for (int on = 0; on < 2; on++) {
-                    Engine e;
-                    e.prepare(48000);
-                    initSound(v.data());
-                    v[FLT_FREQ] = 0.55f;
-                    v[FLT_RES] = 0.4f;
-                    v[FLT_DRIVE] = 0.3f;
-                    const int b = L2_RATE + 6 * n;
-                    v[(size_t)b] = 0.55f;
-                    v[(size_t)(b + 3)] = (float)((n + d) % 5);
-                    v[(size_t)(b + 4)] = (float)d;
-                    v[(size_t)(b + 5)] = on ? 0.8f : 0.0f;
-                    load(e, v.data());
-                    e.noteOn(52, 0.8f);
-                    std::vector<float> r;
-                    Stats st = run(e, 24000, 256, &outs[on], &r);
-                    CHECK(st.finite, "lfo %d dest %d: not finite", n + 2, d);
-                    peak[on] = st.peak;
-                    if (d == 6)          /* (pan: the right side tells) */
-                        outs[on] = r;
-                }
-                double diff = 0.0;
-                for (size_t i = 0; i < outs[0].size(); i++)
-                    diff += std::fabs(outs[0][i] - outs[1][i]);
-                if (diff < 1.0 || peak[1] > 2.0f) {
-                    std::printf("  lfo %d dest %d: diff %.3f peak %.3f\n", n + 2, d, diff, peak[1]);
-                    still++;
-                }
-            }
-        CHECK(still == 0, "%d LFO destinations do nothing", still);
-    }
-
     /* the morph: the wheel opens the filter */
     {
         float rms[2];

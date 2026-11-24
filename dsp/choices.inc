@@ -17,5 +17,4 @@ static const char *const CH_FX[] = {"FLANGER", "PHASER", "RING MOD", "CHORUS", "
 static const char *const CH_DLY_DIV[] = {"1/2", "1/4", "1/8", "1/16", "1/32", "1/64", "1/4D", "1/8D", "1/16D", "1/2T", "1/4T", "1/8T", "1/16T", "1/32T", "1/4S", "1/8S", "1/16S"};
 static const char *const CH_FEEDBACK[] = {"1", "2", "3", "4"};
 static const char *const CH_REVERB[] = {"ROOM", "STAGE 1", "STAGE 2", "HALL 1", "HALL 2"};
-static const char *const CH_LFO_DEST[] = {"PITCH", "OSC CTRL", "FILTER", "RESONANCE", "DRIVE", "AMP", "PAN"};
 #define NCH(x) ((int)(sizeof(x) / sizeof(x[0])))

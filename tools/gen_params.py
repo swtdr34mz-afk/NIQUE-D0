@@ -75,7 +75,6 @@ CH("CH_DLY_DIV", ["1/2", "1/4", "1/8", "1/16", "1/32", "1/64", "1/4D", "1/8D", "
                   "1/2T", "1/4T", "1/8T", "1/16T", "1/32T", "1/4S", "1/8S", "1/16S"])
 CH("CH_FEEDBACK", ["1", "2", "3", "4"])
 CH("CH_REVERB", ["ROOM", "STAGE 1", "STAGE 2", "HALL 1", "HALL 2"])
-CH("CH_LFO_DEST", ["PITCH", "OSC CTRL", "FILTER", "RESONANCE", "DRIVE", "AMP", "PAN"])
 
 # ------------------------------------------------------------------------------------------------ parameters ---
 P("OUT_LEVEL", "out_level", "OUTPUT LEVEL", "Level", default=0.7)
@@ -172,17 +171,6 @@ for e, n, s in MORPH:
 for e, n, s in MORPH:
     if e not in WHEEL_ONLY:
         P("MV_" + e, "mv_" + e.lower(), "MORPH VELOCITY " + n, "MV " + s, "K_BIP", default=0.5)
-
-# LFO 2, 3, 4: each its own rate (or the host's tempo), waveform, destination and amount (all bipolar)
-LDEF = {2: (0.42, 3, 2), 3: (0.3, 3, 5), 4: (0.55, 4, 1)}
-for n in (2, 3, 4):
-    rate, wave, dest = LDEF[n]
-    P("L%d_RATE" % n, "l%d_rate" % n, "LFO %d RATE" % n, "LFO%d Rate" % n, default=rate)
-    P("L%d_SYNC" % n, "l%d_sync" % n, "LFO %d MST CLK" % n, "LFO%d MstClk" % n, "K_SW", default=0)
-    P("L%d_DIV" % n, "l%d_div" % n, "LFO %d CLOCK DIV" % n, "LFO%d Div" % n, "K_CH", "CH_LFO_DIV", default=4)
-    P("L%d_WAVE" % n, "l%d_wave" % n, "LFO %d WAVEFORM" % n, "LFO%d Wave" % n, "K_CH", "CH_LFO_WAVE", default=wave)
-    P("L%d_DEST" % n, "l%d_dest" % n, "LFO %d DESTINATION" % n, "LFO%d Dest" % n, "K_CH", "CH_LFO_DEST", default=dest)
-    P("L%d_AMT" % n, "l%d_amt" % n, "LFO %d AMOUNT" % n, "LFO%d Amount" % n, default=0.0)
 
 # -------------------------------------------------------------------------------------------------- output ---
 ids = [r[1] for r in rows]

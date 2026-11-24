@@ -209,7 +209,7 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     tool("PANIC", [this](const ModifierKeys &) { proc.panicRequest = true; }, 1238, 64);
 
     /* ------------------------------------------------------- MORPH, the octave, HOLD, the wheels --- */
-    section({12, 72, 176, 644}, "MORPH");
+    section({12, 72, 176, 476}, "MORPH");
     add(new ActionKey("WHEEL", [this](const ModifierKeys &) { ui.morph = ui.morph == 1 ? 0 : 1; page.repaint(); },
                       [this] { return ui.morph == 1 ? 1.0f : 0.0f; }), {24, 94, 70, 54});
     add(new ActionKey("VELOCITY", [this](const ModifierKeys &) { ui.morph = ui.morph == 2 ? 0 : 2; page.repaint(); },
@@ -231,10 +231,10 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     add(new ActionKey("<", [octStep](const ModifierKeys &) { octStep(-1); }), {40, 282, 50, 30});
     add(new ActionKey(">", [octStep](const ModifierKeys &) { octStep(1); }), {110, 282, 50, 30});
     key("hold", "HOLD", {70, 334, 60, 52});
-    add(new Wheel(true, [this] { return proc.bendPos.load(); }, [this](float v) { proc.uiBend = v; }), {38, 410, 48, 262});
-    add(new Wheel(false, [this] { return proc.wheelPos.load(); }, [this](float v) { proc.uiWheel = v; }), {112, 410, 48, 262});
-    text({30, 680, 64, 14}, "PITCH", 10.0f);
-    text({104, 680, 64, 14}, "MOD", 10.0f);
+    add(new Wheel(true, [this] { return proc.bendPos.load(); }, [this](float v) { proc.uiBend = v; }), {38, 400, 48, 124});
+    add(new Wheel(false, [this] { return proc.wheelPos.load(); }, [this](float v) { proc.uiWheel = v; }), {112, 400, 48, 124});
+    text({30, 526, 64, 14}, "PITCH", 10.0f);
+    text({104, 526, 64, 14}, "MOD", 10.0f);
 
     /* ------------------------------------------------------------------------- ARPEGGIATOR --- */
     section({196, 72, 200, 230}, "ARPEGGIATOR");
@@ -261,7 +261,7 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     }
 
     /* --------------------------------------------------------------------------------- LFO --- */
-    section({404, 72, 168, 300}, "LFO 1");
+    section({404, 72, 168, 300}, "LFO");
     auto *lfoRate = knob("lfo_rate", "RATE/TIME", {410, 90, 84, 96});
     auto *lfoDiv = knob("lfo_div", "RATE/TIME", {410, 90, 84, 96});
     sync(lfoRate, lfoDiv, LFO_SYNC);
@@ -381,22 +381,6 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
         auto *rt = sel("rev_type", {"ROOM", "STAGE 1", "STAGE 2", "HALL 1", "HALL 2"}, {1698, 474, 126, 70});
         rt->twoColumns = true;
         rt->rowH = 14;
-    }
-
-    /* ------------------------------------------------------------------------- LFO 2, 3, 4 --- */
-    for (int n = 2; n <= 4; n++) {
-        const int x = 196 + (n - 2) * 548, y = 556;
-        auto id = [n](const char *what) { return String("l") + String(n) + "_" + what; };
-        section({x, y, 536, 160}, "LFO " + String(n));
-        auto *fr = add(new Knob(a, id("rate"), "RATE", ui), R(x + 10, y + 24, 84, 100));
-        auto *dv = add(new Knob(a, id("div"), "RATE", ui), R(x + 10, y + 24, 84, 100));
-        sync(fr, dv, L2_RATE + 6 * (n - 2) + 1);
-        key(id("sync").toRawUTF8(), "MST CLK", {x + 98, y + 34, 56, 54});
-        sel(id("wave").toRawUTF8(), {"SQUARE", "SAW", "INV SAW", "TRIANGLE", "S/H"}, {x + 160, y + 22, 96, 128});
-        auto *ds = sel(id("dest").toRawUTF8(), {"PITCH", "OSC CTRL", "FILTER", "RESONANCE", "DRIVE", "AMP", "PAN"},
-                       {x + 262, y + 20, 176, 112}, "DESTINATION");
-        ds->twoColumns = true;
-        add(new Knob(a, id("amt"), "AMOUNT", ui), R(x + 440, y + 22, 90, 104));
     }
 
     for (float sx : {8.0f, (float)W * 0.5f, (float)W - 8.0f})   /* the panel's screws */

@@ -78,7 +78,7 @@ const Preset PRESETS[] = {
      "osc_wave=O1 osc_config=PITCH flt_type=LP12 flt_freq=0.5 aenv_r=0.1 voice_mode=MONO"},
     {"BASS", "WOBBLE BASS",
      "osc_wave=SAW osc_config=DETUNE osc_ctrl=0.14 flt_type=LP_M flt_freq=0.3 flt_res=0.45 flt_menv=0.1 "
-     "flt_drive=0.35 voice_mode=LEGATO glide=0.1 l2_sync=on l2_div=1/8 l2_wave=TRIANGLE l2_dest=FILTER l2_amt=0.7 "
+     "flt_drive=0.35 voice_mode=LEGATO glide=0.1 flt_lfo=0.6 lfo_sync=on lfo_div=1/8 lfo_wave=TRIANGLE "
      "mw_flt_drive=0.8"},
     /* ------------------------------------------------------------------------------------------------- pads */
     {"PAD", "STRING PAD",
@@ -98,8 +98,7 @@ const Preset PRESETS[] = {
      "rev_mix=0.4"},
     {"PAD", "MOVING PAD",
      "osc_wave=A4 osc_config=DETUNE osc_ctrl=0.24 flt_type=LP24 flt_freq=0.5 flt_res=0.3 aenv_a=0.55 aenv_r=0.62 "
-     "l2_rate=0.2 l2_wave=TRIANGLE l2_dest=FILTER l2_amt=0.35 l3_rate=0.32 l3_wave=TRIANGLE l3_dest=PAN "
-     "l3_amt=0.7 l4_rate=0.14 l4_wave=S/H l4_dest=OSC_CTRL l4_amt=0.3 fx_on=on fx_type=CHORUS fx_amt=0.5 "
+     "flt_lfo=0.3 lfo_rate=0.2 osc_lfo=0.25 fx_on=on fx_type=CHORUS fx_amt=0.5 "
      "rev_on=on rev_type=HALL_2 rev_mix=0.4"},
     {"PAD", "VOX PAD",
      "osc_wave=F3 osc_config=DETUNE osc_ctrl=0.22 flt_type=LP12 flt_freq=0.7 aenv_a=0.55 aenv_r=0.6 "

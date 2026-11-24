@@ -178,11 +178,6 @@ struct Impl {
     /* the LFO, the vibrato */
     float lfoPh = 0.0f, lfoSH = 0.5f, vibPh = 0.0f;
     float lfoU[BLOCK * MAXOS] = {}, lfoB[BLOCK * MAXOS] = {};
-    /* LFO 2, 3, 4: their sums at each destination (PITCH, OSC CTRL, FILTER, RESONANCE, DRIVE, AMP, PAN) */
-    static constexpr int NDEST = 7;
-    float lxPh[3] = {0.0f, 0.33f, 0.66f}, lxSH[3] = {0.5f, 0.5f, 0.5f};
-    float dest[NDEST][BLOCK * MAXOS] = {};
-    bool destUsed[NDEST] = {};
     Rng rng;
 
     /* the buffers */
@@ -603,49 +598,6 @@ struct Impl {
         }
         mLfo = lfoU[m - 1];
 
-        /* LFO 2, 3, 4 */
-        for (int d = 0; d < NDEST; d++) {
-            std::fill(dest[d], dest[d] + m, 0.0f);
-            destUsed[d] = false;
-        }
-        for (int n = 0; n < 3; n++) {
-            const int base = L2_RATE + 6 * n;   /* RATE, SYNC, DIV, WAVE, DEST, AMT */
-            float amt = val[base + 5];
-            if (amt <= 0.0001f)
-                continue;
-            int wv = ch(base + 3), ds = std::min(NDEST - 1, std::max(0, ch(base + 4)));
-            float inc;
-            if (sw(base + 1)) {
-                float beats = LFO_DIV_BEATS[std::min(16, std::max(0, ch(base + 2)))];
-                inc = (float)(bpm / 60.0 / beats) / fsI;
-                if (playing) {
-                    double p = ppq / beats;
-                    float want = (float)(p - std::floor(p)), dd = want - lxPh[n];
-                    if (std::fabs(dd) > 0.02f && std::fabs(dd) < 0.98f)
-                        lxPh[n] = want;
-                }
-            } else
-                inc = map::lfoHz(val[base]) / fsI;
-            destUsed[ds] = true;
-            float *o = dest[ds];
-            for (int i = 0; i < m; i++) {
-                float &ph = lxPh[n];
-                ph += inc;
-                if (ph >= 1.0f) {
-                    ph -= std::floor(ph);
-                    lxSH[n] = rng.uni();
-                }
-                float u;
-                switch (wv) {
-                case 0: u = ph < 0.5f ? 1.0f : 0.0f; break;
-                case 1: u = ph; break;
-                case 2: u = 1.0f - ph; break;
-                case 3: u = ph < 0.5f ? 2.0f * ph : 2.0f - 2.0f * ph; break;
-                default: u = lxSH[n]; break;
-                }
-                o[i] += amt * (2.0f * u - 1.0f);
-            }
-        }
         vibPh += map::vibHz(val[VIB_RATE]) * dtBlock;
         vibPh -= std::floor(vibPh);
 
@@ -827,13 +779,12 @@ struct Impl {
         fLfo = fLfo * fLfo * 6.0f;
         float res = eff(FLT_RES, vel), drive = eff(FLT_DRIVE, vel);
         const float cutMax = std::log2(0.44f * fs), cutMin = std::log2(14.0f);
-        float kSvf = 2.0f * (1.0f - 0.985f * res);
-        float kLad = ft == 2 ? 4.15f * res : 3.95f * res;
+        const float kSvf = 2.0f * (1.0f - 0.985f * res);
+        const float kLad = ft == 2 ? 4.15f * res : 3.95f * res;
         float lvl = map::level(eff(OUT_LEVEL, vel));
         float velGain = sw(AENV_VEL) ? 0.12f + 0.88f * std::pow(vel, 1.3f) : 1.0f;
         float gainL = 0.42f * lvl * velGain * x.gl, gainR = 0.42f * lvl * velGain * x.gr;
         float dGain = 1.0f + 9.0f * drive * drive, dComp = (1.0f + drive) / (1.0f + 2.5f * drive);
-        float resNow = res;
 
         float sh = x.lfoSH;
         float *L = osL, *R = osR;
@@ -856,13 +807,11 @@ struct Impl {
             } else
                 lfo = lfoBip ? lfoB[i] : lfoU[i];
 
-            /* LFO 2-4 */
-            const float xPitch = destUsed[0] ? dest[0][i] : 0.0f;
-            const float rfs = destUsed[0] ? fexp2(xPitch * xPitch * (xPitch < 0.0f ? -1.0f : 1.0f)) / fs : 1.0f / fs;
-            float y, c = clampf(ctrl + oLfo * oLfo * lfo + oEnv * menv + (destUsed[1] ? 0.5f * dest[1][i] : 0.0f), 0.0f, 1.0f);
+            const float rfs = 1.0f / fs;
+            float y, c = clampf(ctrl + oLfo * oLfo * lfo + oEnv * menv, 0.0f, 1.0f);
             switch (kind) {
             case C_PITCH: {
-                float s = map::pitchSemis(clampf(ctrl + (destUsed[1] ? 0.5f * dest[1][i] : 0.0f), 0.0f, 1.0f)) + 24.0f * oLfo * oLfo * lfo + 48.0f * oEnv * oEnv * menv;
+                float s = map::pitchSemis(ctrl) + 24.0f * oLfo * oLfo * lfo + 48.0f * oEnv * oEnv * menv;
                 x.ph1 += fTab * fexp2(s / 12.0f) * rfs;
                 x.ph1 -= std::floor(x.ph1);
                 y = r1(x.ph1);
@@ -898,7 +847,7 @@ struct Impl {
             case C_DETUNE: {
                 x.ph1 += fTab * rfs;
                 x.ph1 -= std::floor(x.ph1);
-                x.ph2 += inc2 * rfs * fs;
+                x.ph2 += inc2;
                 x.ph2 -= std::floor(x.ph2);
                 y = 0.65f * (r1(x.ph1) + r1(x.ph2));
                 break;
@@ -936,14 +885,7 @@ struct Impl {
             }
 
             /* the filter */
-            float cl = clampf(cutBase + fEnv * menv + fLfo * (lfoBip ? 0.5f * (lfo + 1.0f) : lfo) +
-                                  (destUsed[2] ? 4.0f * dest[2][i] : 0.0f), cutMin, cutMax);
-            if (destUsed[3]) {
-                float rr = clampf(res + 0.5f * dest[3][i], 0.0f, 1.0f);
-                kSvf = 2.0f * (1.0f - 0.985f * rr);
-                kLad = ft == 2 ? 4.15f * rr : 3.95f * rr;
-                resNow = rr;
-            }
+            float cl = clampf(cutBase + fEnv * menv + fLfo * (lfoBip ? 0.5f * (lfo + 1.0f) : lfo), cutMin, cutMax);
             float g = ftan(std::min(1.45f, PI * fexp2(cl) / fs));
             float in = y * 0.85f;
             float out;
@@ -973,7 +915,7 @@ struct Impl {
                 float k = kLad;
                 if (ft == 3) {           /* the diode ladder: less resonance down low, never self-oscillating */
                     float t = clampf((cl - 6.3f) / 3.3f, 0.25f, 1.0f);
-                    k = 3.3f * resNow * t;
+                    k = 3.3f * res * t;
                     S -= x.hpz;
                 }
                 float u = (in - k * S) / (1.0f + k * G4);
@@ -1003,22 +945,10 @@ struct Impl {
                         out = y4;
                 }
             }
-            if (destUsed[4]) {
-                float dr = clampf(drive + 0.5f * dest[4][i], 0.0f, 1.0f);
-                if (dr > 0.001f)
-                    out = ftanh(out * (1.0f + 9.0f * dr * dr)) * (1.0f + dr) / (1.0f + 2.5f * dr);
-            } else if (drive > 0.001f)
+            if (drive > 0.001f)
                 out = ftanh(out * dGain) * dComp;
-            float gl = gainL, gr = gainR;
-            if (destUsed[5])                 /* tremolo */
-                out *= clampf(1.0f - 0.5f * std::fabs(dest[5][i]) + 0.5f * dest[5][i], 0.0f, 1.5f);
-            if (destUsed[6]) {
-                float pn = clampf(dest[6][i], -1.0f, 1.0f);
-                gl *= std::min(1.0f, 1.0f - pn);
-                gr *= std::min(1.0f, 1.0f + pn);
-            }
-            L[i] += out * a * gl;
-            R[i] += out * a * gr;
+            L[i] += out * a * gainL;
+            R[i] += out * a * gainR;
         }
         x.inc1 = f0;
         x.cutLog = cutBase;
