@@ -116,30 +116,30 @@ struct NiqueEditor::Header : Component {
     {
         drawLogo(g, logo());
         drawLed(g, {290.0f, 26.0f}, 3.4f, ed.proc.voices.load() > 0 ? 1.0f : 0.0f);
-        drawLabel(g, "PLAY", {272.0f, 34.0f, 36.0f, 14.0f}, 9.5f);
-        drawLabel(g, "PROGRAM", {330.0f, 1.0f, 120.0f, 14.0f}, 9.5f, Justification::centredLeft);
+        drawLabel(g, "PLAY", {266.0f, 34.0f, 48.0f, 16.0f}, 9.5f);
+        drawLabel(g, "PROGRAM", {330.0f, 0.0f, 120.0f, 16.0f}, 9.5f, Justification::centredLeft);
         int p = ed.proc.getCurrentProgram();
         drawDisplay(g, num(), String(p + 1).paddedLeft('0', 3) + (edited ? "." : ""), 3);
         drawLcd(g, name());
-        g.setFont(font(Face::mono, 16.0f));
+        g.setFont(font(Face::mono, 18.0f));
         g.setColour(col::lcdText);
         g.drawText(ed.proc.getProgramName(p), name().reduced(10.0f, 0.0f), Justification::centredLeft, true);
         g.setColour(col::lcdText.withAlpha(0.55f));
-        g.setFont(font(Face::mono, 11.0f));
+        g.setFont(font(Face::mono, 12.5f));
         String grp = p < numPresets() ? String(presetGroup(p)) : String("YOURS");
         g.drawText(grp, name().reduced(8.0f, 0.0f), Justification::centredRight, true);
-        drawLabel(g, "LIKES", {872.0f, 1.0f, 70.0f, 14.0f}, 9.5f, Justification::centredLeft);
+        drawLabel(g, "LIKES", {872.0f, 0.0f, 70.0f, 16.0f}, 9.5f, Justification::centredLeft);
         int n = ed.proc.numLikes();
         drawDisplay(g, likeNum(), n == 0 ? String("--") : String(ed.proc.likePos + 1) + "-" + String(n), 5);
         drawLcd(g, read());
         if (ed.inHand) {
-            g.setFont(font(Face::mono, 15.0f));
+            g.setFont(font(Face::mono, 17.0f));
             g.setColour(col::lcdText.withAlpha(0.7f));
             g.drawText(ed.inHand->getName(40), read().reduced(12.0f, 0.0f), Justification::centredLeft, true);
             g.setColour(col::lcdText);
             g.drawText(ed.inHand->getCurrentValueAsText(), read().reduced(12.0f, 0.0f), Justification::centredRight, true);
         } else {
-            g.setFont(font(Face::mono, 13.0f));
+            g.setFont(font(Face::mono, 14.0f));
             g.setColour(col::lcdText.withAlpha(0.5f));
             g.drawText(ed.ui.morph == 0 ? "TOUCH A CONTROL: ITS NAME AND VALUE"
                                         : (ed.ui.morph == 1 ? "MORPH WHEEL: TURN A KNOB TO WHERE THE WHEEL TAKES IT"
@@ -295,9 +295,9 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
 
     /* ------------------------------------------------------------------------- OSCILLATORS --- */
     section({706, 72, 400, 476}, "OSCILLATORS");
-    section({716, 92, 116, 312}, "MODULATION", true);
-    knob("osc_lfo", "LFO AMT", {722, 104, 104, 112});
-    knob("osc_menv", "MODENV AMT", {722, 238, 104, 112});
+    section({716, 102, 116, 304}, "MODULATION", true);
+    knob("osc_lfo", "LFO AMT", {722, 112, 104, 114});
+    knob("osc_menv", "MODENV AMT", {722, 240, 104, 114});
     page.arrows.push_back({800.0f, 408.0f, 880.0f, 440.0f});
     {
         auto *w = add(new Endless(a, "osc_wave", ui, waveShort, [](int w) { return String(waveLongName(w)); }, waveGroup),
@@ -337,14 +337,14 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
 
     /* ------------------------------------------------------------------------------ FILTER --- */
     section({1114, 72, 300, 476}, "FILTER");
-    section({1122, 92, 100, 312}, "MODULATION", true);
-    knob("flt_lfo", "LFO AMT", {1126, 104, 92, 106});
-    knob("flt_menv", "MODENV AMT", {1126, 238, 92, 106});
-    page.arrows.push_back({1224.0f, 196.0f, 1252.0f, 196.0f});
+    section({1122, 102, 100, 304}, "MODULATION", true);
+    knob("flt_lfo", "LFO AMT", {1126, 112, 92, 108});
+    knob("flt_menv", "MODENV AMT", {1126, 240, 92, 108});
+    page.arrows.push_back({1224.0f, 214.0f, 1246.0f, 214.0f});
     auto *freq = knob("flt_freq", "FREQ", {1228, 84, 180, 196});
     freq->redCap = true;
     knob("flt_res", "RESONANCE", {1228, 292, 92, 104});
-    sel("flt_type", {"LP12", "LP24", "LP M", "LP TB", "BP", "HP"}, {1326, 288, 82, 128}, "TYPE");
+    sel("flt_type", {"LP12", "LP24", "LP M", "LP TB", "BP", "HP"}, {1326, 280, 82, 146}, "TYPE")->rowH = 16;
     knob("flt_drive", "DRIVE", {1126, 416, 92, 104});
     {
         auto *kb = sel("flt_kb", {"OFF", "1/3", "2/3", "1"}, {1228, 430, 176, 84}, "KB TRACK");
@@ -362,7 +362,7 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     section({1548, 72, 136, 236}, "FX");
     knob("fx_amt", "RATE/AMT", {1554, 90, 80, 94});
     key("fx_on", "ON", {1638, 96, 40, 54});
-    sel("fx_type", {"FLANGER", "PHASER", "RING MOD", "CHORUS", "ENSEMBLE", "DRIVE"}, {1556, 190, 122, 112});
+    sel("fx_type", {"FLANGER", "PHASER", "RING MOD", "CHORUS", "ENSEMBLE", "DRIVE"}, {1556, 184, 122, 120})->rowH = 16;
 
     /* ------------------------------------------------------------------------------ OUTPUT --- */
     section({1548, 316, 136, 232}, "OUTPUT");
@@ -405,8 +405,13 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     setResizable(true, true);
     getConstrainer()->setFixedAspectRatio((double)W / (double)H);
     setResizeLimits(W * 2 / 5, H * 2 / 5, (int)(W * 1.5f), (int)(H * 1.5f));
+    /* the window: as it was left, or (the first time) as large as the screen allows, and never larger than it */
+    float fit = 1.0f;
+    if (auto *d = Desktop::getInstance().getDisplays().getPrimaryDisplay())
+        fit = jmin(1.25f, 0.96f * (float)d->userArea.getWidth() / (float)W, 0.88f * (float)d->userArea.getHeight() / (float)H);
     float s = proc.uiScale.load();
-    setSize((int)std::lround(W * s), (int)std::lround(H * s));
+    s = s < 0.0f ? fit : jmin(s, jmax(fit, 0.4f));
+    setSize((int)std::lround(W * jmax(0.4f, s)), (int)std::lround(H * jmax(0.4f, s)));
     timerCallback();
     startTimerHz(30);
 }

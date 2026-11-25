@@ -142,9 +142,9 @@ void drawSection(Graphics &g, Rectangle<float> r, const String &title)
     g.setColour(Colours::white.withAlpha(0.10f));
     g.drawLine(r.getX() + 6.0f, r.getY() + 0.8f, r.getRight() - 6.0f, r.getY() + 0.8f, 1.0f);
     if (title.isNotEmpty()) {            /* the name in a darker tab on the top edge */
-        auto f = font(Face::logo, 14.5f).withExtraKerningFactor(0.06f);
+        auto f = font(Face::logo, 17.0f).withExtraKerningFactor(0.05f);
         float w = GlyphArrangement::getStringWidth(f, title) + 20.0f;
-        auto t = Rectangle<float>(r.getX() + 10.0f, r.getY() - 1.0f, w, 19.0f);
+        auto t = Rectangle<float>(r.getX() + 10.0f, r.getY() - 1.0f, w, 22.0f);
         Path tab;
         tab.addRoundedRectangle(t.getX(), t.getY(), t.getWidth(), t.getHeight(), 4.0f, 4.0f, false, false, true, true);
         g.setColour(Colour(0xff36373b));
@@ -160,9 +160,9 @@ void drawSub(Graphics &g, Rectangle<float> r, const String &title)
     g.setColour(col::print.withAlpha(0.75f));
     g.drawRoundedRectangle(r, 4.0f, 1.1f);
     if (title.isNotEmpty()) {
-        auto f = font(Face::title, 11.5f);
+        auto f = font(Face::title, 13.5f);
         float w = GlyphArrangement::getStringWidth(f, title) + 12.0f;
-        auto t = Rectangle<float>(w, 14.0f).withCentre({r.getCentreX(), r.getY()});
+        auto t = Rectangle<float>(w, 16.0f).withCentre({r.getCentreX(), r.getY()});
         g.setColour(Colour(0xff58595d));
         g.fillRect(t);
         g.setColour(col::print);
@@ -182,17 +182,17 @@ void drawKnob(Graphics &g, Rectangle<float> r, float pos, bool redCap, bool scal
     auto c = r.getCentre();
     const float rad = d * 0.5f;
     const bool numbers = scale && d > 66.0f;
-    const float body = scale ? (numbers ? rad - 19.0f : rad - 9.0f) : rad * 0.9f;
+    const float body = scale ? (numbers ? rad - 20.0f : rad - 9.0f) : rad * 0.9f;
     const float PI_ = MathConstants<float>::pi;
     if (scale) {                         /* the printed scale: 0 .. 10, a figure at each step on the larger ones */
         g.setColour(col::print);
-        float fs = jlimit(7.5f, 10.0f, body * 0.3f);
+        float fs = jlimit(10.0f, 13.0f, body * 0.42f);
         g.setFont(font(Face::title, fs));
         for (int k = 0; k <= 10; k++) {
             float a = -A0 + ASPAN * (float)k / 10.0f;
             if (numbers) {
-                auto p = c.getPointOnCircumference(body + 10.5f, a);
-                g.drawText(String(k), Rectangle<float>(16.0f, 11.0f).withCentre(p), Justification::centred, false);
+                auto p = c.getPointOnCircumference(body + 11.0f, a);
+                g.drawText(String(k), Rectangle<float>(18.0f, 13.0f).withCentre(p), Justification::centred, false);
             } else {
                 auto p1 = c.getPointOnCircumference(body + 3.0f, a), p2 = c.getPointOnCircumference(body + (k % 5 == 0 ? 7.5f : 5.5f), a);
                 g.drawLine({p1, p2}, k % 5 == 0 ? 1.5f : 1.0f);
@@ -456,8 +456,8 @@ void drawLcd(Graphics &g, Rectangle<float> r)
 void drawLabel(Graphics &g, const String &s, Rectangle<float> r, float size, Justification j, Colour c)
 {
     g.setColour(c);
-    g.setFont(font(Face::label, size));
-    g.drawFittedText(s, r.toNearestInt(), j, 2, 0.8f);
+    g.setFont(font(Face::label, size * TEXT));
+    g.drawFittedText(s, r.toNearestInt(), j, 2, 0.75f);
 }
 
 void drawLogo(Graphics &g, Rectangle<float> r)

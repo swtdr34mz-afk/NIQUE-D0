@@ -71,7 +71,7 @@ public:
     std::atomic<float> uiWheel{-1.0f}, uiBend{-1.0f};
     std::atomic<float> wheelPos{0.0f}, bendPos{0.5f}, lfoLevel{0.0f}, outLevel{0.0f};
     std::atomic<int> voices{0};
-    std::atomic<float> uiScale{0.72f};
+    std::atomic<float> uiScale{-1.0f};    /* the window's size (-1: never set: as large as the screen allows) */
     std::atomic<bool> panicRequest{false};
 
 private:
