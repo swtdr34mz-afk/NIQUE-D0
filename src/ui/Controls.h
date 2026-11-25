@@ -77,7 +77,7 @@ public:
     juce::StringArray names;
     juce::String legend;                 /* under the key */
     bool keyAtTop = false, twoColumns = false, hasKey = true;
-    int rowH = 15;
+    int rowH = 17;
 
 private:
     UiState &ui;

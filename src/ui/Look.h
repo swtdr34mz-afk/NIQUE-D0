@@ -25,6 +25,7 @@ struct UiResources {
     ~UiResources();
 };
 juce::Font font(Face f, float height);
+constexpr float TEXT = 1.3f;            /* the print's size against the first panel (readable on a laptop) */
 
 class Look : public juce::LookAndFeel_V4
 {

@@ -31,7 +31,7 @@ Rectangle<float> Knob::knobArea() const
 {
     auto r = getLocalBounds().toFloat();
     if (legend.isNotEmpty())
-        r.removeFromBottom(16.0f);
+        r.removeFromBottom(19.0f);
     float d = knobSize > 0.0f ? knobSize : jmin(r.getWidth(), r.getHeight());
     return Rectangle<float>(d, d).withCentre(r.getCentre());
 }
@@ -59,7 +59,7 @@ void Knob::paint(Graphics &g)
         drawLed(g, c, 3.0f, any ? 1.0f : (ui.morph && can ? 0.25f : 0.0f), col::green);
     }
     if (legend.isNotEmpty())
-        drawLabel(g, legend, getLocalBounds().toFloat().removeFromBottom(16.0f), 11.0f);
+        drawLabel(g, legend, getLocalBounds().toFloat().removeFromBottom(19.0f), 11.0f);
 }
 
 void Knob::mouseEnter(const MouseEvent &) { ui.touched(editing ? *editing : param); }
@@ -159,11 +159,11 @@ void Key::paint(Graphics &g)
     drawLed(g, ledArea.getCentre(), 3.6f, on() ? 1.0f : 0.0f);
     Rectangle<float> lab;
     if (legend.isNotEmpty())
-        lab = r.removeFromBottom(15.0f);
+        lab = r.removeFromBottom(18.0f);
     auto k = Rectangle<float>(jmin(r.getWidth() - 2.0f, 40.0f), jmin(r.getHeight() - 4.0f, 20.0f)).withCentre(r.getCentre());
     drawKey(g, k, down);
     if (legend.isNotEmpty())
-        drawLabel(g, legend, lab, 10.5f);
+        drawLabel(g, legend, lab.expanded(8.0f, 0.0f), 10.5f);
 }
 
 void Key::mouseEnter(const MouseEvent &) { ui.touched(param); }
@@ -235,7 +235,7 @@ void Selector::paint(Graphics &g)
     if (hasKey) {
         drawKey(g, keyArea(), down);
         if (legend.isNotEmpty())
-            drawLabel(g, legend, keyArea().translated(0.0f, 19.0f).expanded(20.0f, 0.0f).withHeight(14.0f), 10.5f);
+            drawLabel(g, legend, keyArea().translated(0.0f, 20.0f).expanded(20.0f, 0.0f).withHeight(17.0f), 10.5f);
     }
 }
 
@@ -411,7 +411,7 @@ void ActionKey::paint(Graphics &g)
     }
     Rectangle<float> lab;
     if (legend.isNotEmpty())
-        lab = legendAbove ? r.removeFromTop(15.0f) : r.removeFromBottom(15.0f);
+        lab = legendAbove ? r.removeFromTop(18.0f) : r.removeFromBottom(18.0f);
     auto k = Rectangle<float>(jmin(r.getWidth() - 2.0f, 44.0f), jmin(r.getHeight() - 4.0f, 20.0f)).withCentre(r.getCentre());
     drawKey(g, k, down, true);
     if (legend.isNotEmpty())
