@@ -296,7 +296,8 @@ void NiqueProcessor::getStateInformation(juce::MemoryBlock &destData)
     auto state = apvts.copyState();
     state.setProperty("program", program, nullptr);
     state.setProperty("uiScale", uiScale.load(), nullptr);
-    state.setProperty("uiVersion", 2, nullptr);   /* (2: the larger print; an older size is not kept) */
+    state.setProperty("uiVersion", 2, nullptr);
+    state.setProperty("uiLayout", uiLayout.load(), nullptr);   /* (2: the larger print; an older size is not kept) */
     juce::MemoryOutputStream likeData;   /* the likes: how many values each, then the sounds' values */
     likeData.writeInt(NPARAMS);
     for (auto &l : likes)
@@ -318,6 +319,7 @@ void NiqueProcessor::setStateInformation(const void *data, int sizeInBytes)
                 float u = (int)state.getProperty("uiVersion", 1) >= 2 ? (float)state.getProperty("uiScale", -1.0f) : -1.0f;
                 uiScale = u < 0.0f ? -1.0f : juce::jlimit(0.4f, 1.5f, u);
             }
+            uiLayout = juce::jlimit(0, 1, (int)state.getProperty("uiLayout", 0));
             likes.clear();
             juce::MemoryBlock mb;
             if (mb.fromBase64Encoding(state.getProperty("likes", "").toString())) {

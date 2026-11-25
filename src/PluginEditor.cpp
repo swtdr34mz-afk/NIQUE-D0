@@ -76,13 +76,14 @@ void NiqueEditor::Page::paint(Graphics &g)
         cg.addTransform(AffineTransform::scale(sc));
         for (auto &s : sections)
             if (s.sub)
-                drawSub(cg, s.r, s.title);
+                drawSub(cg, compact ? s.rc : s.r, s.title);
             else
-                drawSection(cg, s.r, s.title);
+                drawSection(cg, compact ? s.rc : s.r, s.title);
         for (auto &t : texts)
-            drawLabel(cg, t.text, t.r, t.size, t.j);
+            drawLabel(cg, t.text, compact ? t.rc : t.r, t.size, t.j);
         cg.setColour(col::print.withAlpha(0.7f));
-        for (auto &l : arrows) {
+        for (auto &l0 : arrows) {
+            auto l = compact ? l0.second : l0.first;
             cg.drawLine(l, 1.4f);
             Path p;
             auto e = l.getEnd();
@@ -91,11 +92,13 @@ void NiqueEditor::Page::paint(Graphics &g)
                           e.getPointOnCircumference(7.0f, a - MathConstants<float>::pi * 0.85f));
             cg.fillPath(p);
         }
-        drawTag(cg, {(float)W - 250.0f, (float)H - 34.0f, 230.0f, 26.0f});
-        drawLabel(cg, U("VIRTUAL ANALOG LEAD SYNTHESIZER  ·  swtdr34mz"), {24.0f, (float)H - 32.0f, 420.0f, 22.0f}, 11.0f,
+        const float pw = (float)getWidth(), ph = (float)getHeight();
+        drawTag(cg, {pw - 250.0f, ph - 34.0f, 230.0f, 26.0f});
+        drawLabel(cg, U("VIRTUAL ANALOG LEAD SYNTHESIZER  ·  swtdr34mz"), {24.0f, ph - 32.0f, 420.0f, 22.0f}, 11.0f,
                   Justification::centredLeft);
-        for (auto &p : screws)
-            drawScrew(cg, p, 5.0f);
+        for (float sx : {8.0f, pw * 0.5f, pw - 8.0f})   /* the panel's screws */
+            for (float sy : {8.0f, ph - 8.0f})
+                drawScrew(cg, {sx, sy}, 5.0f);
     }
     Graphics::ScopedSaveState s(g);
     g.setImageResamplingQuality(Graphics::highResamplingQuality);
@@ -110,7 +113,10 @@ struct NiqueEditor::Header : Component {
     Rectangle<float> num() const { return {330.0f, 16.0f, 64.0f, 32.0f}; }
     Rectangle<float> name() const { return {404.0f, 16.0f, 250.0f, 32.0f}; }
     Rectangle<float> likeNum() const { return {872.0f, 16.0f, 70.0f, 32.0f}; }
-    Rectangle<float> read() const { return {1420.0f, 16.0f, 404.0f, 32.0f}; }
+    Rectangle<float> read() const   /* (4:3: the second row) */
+    {
+        return ed.page.compact ? Rectangle<float>{420.0f, 72.0f, 796.0f, 32.0f} : Rectangle<float>{1484.0f, 16.0f, 340.0f, 32.0f};
+    }
     bool edited = false;
     void paint(Graphics &g) override
     {
@@ -155,14 +161,54 @@ struct NiqueEditor::Header : Component {
 };
 
 /* ================================================================================= building the panel === */
-void NiqueEditor::section(R r, const String &title, bool sub) { page.sections.push_back({r.toFloat(), title, sub}); }
-void NiqueEditor::text(R r, const String &t, float size, Justification j) { page.texts.push_back({r.toFloat(), t, size, j}); }
-
-Knob *NiqueEditor::knob(const char *id, const String &legend, R r, float size)
+void NiqueEditor::section(R r, const String &title, bool sub, R rc)
 {
-    auto *k = add(new Knob(proc.apvts, id, legend, ui), r);
+    page.sections.push_back({r.toFloat(), (rc.isEmpty() ? r.translated(cdx, cdy) : rc).toFloat(), title, sub});
+}
+void NiqueEditor::text(R r, const String &t, float size, Justification j, R rc)
+{
+    page.texts.push_back({r.toFloat(), (rc.isEmpty() ? r.translated(cdx, cdy) : rc).toFloat(), t, size, j});
+}
+void NiqueEditor::arrow(Line<float> l, Line<float> lc)
+{
+    if (lc.getLength() <= 0.0f)
+        lc = Line<float>(l.getStart().translated((float)cdx, (float)cdy), l.getEnd().translated((float)cdx, (float)cdy));
+    page.arrows.push_back({l, lc});
+}
+
+Knob *NiqueEditor::knob(const char *id, const String &legend, R r, R rc, float size)
+{
+    auto *k = add(new Knob(proc.apvts, id, legend, ui), r, rc);
     k->knobSize = size;
     return k;
+}
+
+/* both layouts: NORMAL (21:9) and 4:3 (the modules on the right in two rows below) */
+void NiqueEditor::place(bool compact)
+{
+    page.compact = compact;
+    page.dropCache();
+    for (auto &it : placed)
+        it.c->setBounds(compact ? it.compact : it.normal);
+    for (auto *sl : compactTwoCols) {    /* (4:3: the reverb's names in one column, there is height for it) */
+        sl->twoColumns = !compact;
+        sl->rowH = compact ? 17 : 14;
+    }
+    const int w = compact ? WC : W, h = compact ? HC : H;
+    page.setSize(w, h);
+    header->setBounds(0, 0, w, compact ? 112 : 64);
+    proc.uiLayout = compact ? 1 : 0;
+    float fit = 1.0f;
+    if (auto *d = Desktop::getInstance().getDisplays().getPrimaryDisplay())
+        fit = jmin(1.25f, 0.96f * (float)d->userArea.getWidth() / (float)w, 0.88f * (float)d->userArea.getHeight() / (float)h);
+    getConstrainer()->setFixedAspectRatio((double)w / (double)h);
+    setResizeLimits(w * 2 / 5, h * 2 / 5, (int)(w * 1.5f), (int)(h * 1.5f));
+    float s = placedOnce ? fit : proc.uiScale.load();
+    s = s < 0.0f ? fit : jmin(s, jmax(fit, 0.4f));
+    placedOnce = true;
+    setSize((int)std::lround((float)w * jmax(0.4f, s)), (int)std::lround((float)h * jmax(0.4f, s)));
+    resized();
+    page.repaint();
 }
 
 NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
@@ -170,18 +216,19 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     setLookAndFeel(&look);
     ui.touched = [this](RangedAudioParameter &rp) { touched(rp); };
     auto &a = proc.apvts;
-    auto sel = [&](const char *id, StringArray names, R r, const String &legend = {}) {
-        auto *s = add(new Selector(a, id, std::move(names), ui), r);
+    auto sel = [&](const char *id, StringArray names, R r, const String &legend = {}, R rc = {}) {
+        auto *s = add(new Selector(a, id, std::move(names), ui), r, rc);
         s->legend = legend;
         return s;
     };
-    auto key = [&](const char *id, const String &legend, R r) { return add(new Key(a, id, legend, ui), r); };
+    auto key = [&](const char *id, const String &legend, R r, R rc = {}) { return add(new Key(a, id, legend, ui), r, rc); };
     auto sync = [&](Component *freeK, Component *syncK, int param) {
         syncPairs.push_back({freeK, syncK});
         syncParams.push_back(param);
     };
 
-    header = add(new Header(*this), {0, 0, W, 64});
+    header = new Header(*this);
+    page.addAndMakeVisible(header);
 
     /* ------------------------------------------------------------------- the header's keys --- */
     add(new ActionKey("<", [this](const ModifierKeys &) {
@@ -200,7 +247,7 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     (void)lp;
     (void)ln;
     auto tool = [&](const String &legend, std::function<void(const ModifierKeys &)> f, int x, int w) {
-        auto *k = add(new ActionKey(legend, std::move(f)), {x, 2, w, 50});
+        auto *k = add(new ActionKey(legend, std::move(f)), {x, 2, w, 50}, {x - 1000, 58, w, 50});
         k->legendAbove = true;
     };
     tool("INIT", [this](const ModifierKeys &) { proc.initSound(); }, 1024, 56);
@@ -210,13 +257,21 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     {                                    /* the voices' oversampling: 2, 4 or 8 times (click: the list) */
         auto *q = add(new Endless(a, "quality", ui, [](int c) { return String(2 << c); },
                                   [](int c) { return String(2 << c) + "x oversampling" + (c == 0 ? " (light on the CPU)" : c == 1 ? " (the default)" : " (for the final mix)"); }),
-                      {1318, 6, 92, 52});
+                      {1318, 6, 92, 52}, {318, 62, 92, 52});
         q->knob = false;
         q->ghost = 1;
         q->legend = "OVERSAMPLING";
     }
+    {                                    /* the layout: NORMAL (wide) or 4:3 (for small screens) */
+        auto *lay = add(new ActionKey("4:3", [this](const ModifierKeys &) { place(!page.compact); },
+                                      [this] { return page.compact ? 1.0f : 0.0f; }),
+                        {1416, 2, 60, 54}, {1160, 2, 60, 54});
+        (void)lay;
+    }
+    cdy = 48;                            /* (4:3: below the taller header) */
 
     /* ------------------------------------------------------- MORPH, the octave, HOLD, the wheels --- */
+    cdx = 11;
     section({12, 72, 176, 476}, "MORPH");
     add(new ActionKey("WHEEL", [this](const ModifierKeys &) { ui.morph = ui.morph == 1 ? 0 : 1; page.repaint(); },
                       [this] { return ui.morph == 1 ? 1.0f : 0.0f; }), {24, 94, 70, 54});
@@ -245,31 +300,34 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     text({104, 526, 64, 14}, "MOD", 10.0f);
 
     /* ------------------------------------------------------------------------- ARPEGGIATOR --- */
-    section({196, 72, 200, 230}, "ARPEGGIATOR");
-    key("arp_run", "RUN", {206, 96, 50, 54});
-    auto *arpRate = knob("arp_rate", "RATE", {262, 90, 76, 92});
-    auto *arpDiv = knob("arp_div", "RATE", {262, 90, 76, 92});
+    /* (4:3: lying down, in the second row) */
+    const int r2 = 604, r3 = 782;
+    section({196, 72, 200, 230}, "ARPEGGIATOR", false, {23, r2, 330, 170});
+    key("arp_run", "RUN", {206, 96, 50, 54}, {31, r2 + 40, 50, 54});
+    auto *arpRate = knob("arp_rate", "RATE", {262, 90, 76, 92}, {83, r2 + 30, 80, 98});
+    auto *arpDiv = knob("arp_div", "RATE", {262, 90, 76, 92}, {83, r2 + 30, 80, 98});
     sync(arpRate, arpDiv, ARP_SYNC);
-    key("arp_sync", "MST CLK", {340, 96, 52, 54});
-    sel("arp_range", {"1 OCT", "2 OCT", "3 OCT", "4 OCT"}, {206, 188, 88, 104}, "RANGE");
-    sel("arp_dir", {"UP", "DOWN", "UP/DN", "RND"}, {300, 188, 88, 104}, "DIRECTION");
+    key("arp_sync", "MST CLK", {340, 96, 52, 54}, {165, r2 + 40, 54, 54});
+    sel("arp_range", {"1 OCT", "2 OCT", "3 OCT", "4 OCT"}, {206, 188, 88, 104}, "RANGE", {221, r2 + 28, 64, 132});
+    sel("arp_dir", {"UP", "DOWN", "UP/DN", "RND"}, {300, 188, 88, 104}, "DIRECTION", {285, r2 + 28, 64, 132});
 
     /* -------------------------------------------------------------------------- VOICE MODE --- */
-    section({196, 310, 200, 238}, "VOICE MODE");
-    knob("glide", "GLIDE", {204, 330, 70, 84});
-    sel("voice_mode", {"POLY", "MONO", "LEGATO"}, {284, 326, 104, 90}, "MODE");
-    sel("unison", {"OFF", "1", "2", "3"}, {206, 424, 80, 114}, "UNISON");
+    section({196, 310, 200, 238}, "VOICE MODE", false, {361, r2, 310, 170});
+    knob("glide", "GLIDE", {204, 330, 70, 84}, {367, r2 + 30, 78, 98});
+    sel("voice_mode", {"POLY", "MONO", "LEGATO"}, {284, 326, 104, 90}, "MODE", {447, r2 + 28, 86, 132});
+    sel("unison", {"OFF", "1", "2", "3"}, {206, 424, 80, 114}, "UNISON", {535, r2 + 28, 56, 132});
     {
         auto *bend = add(new Endless(a, "bend", ui, [](int c) { return c == 0 ? String("oFF") : c == 15 ? String("-12") : c == 16 ? String("-24") : String(PARAMS[BEND].choices[c]); },
                                      [](int c) { return String(PARAMS[BEND].choices[c]) + (c == 0 ? "" : c < 15 ? " semitones" : " (up / down)"); }),
-                         {296, 436, 92, 54});
+                         {296, 436, 92, 54}, {593, r2 + 52, 74, 54});
         bend->knob = false;
         bend->ghost = 3;
         bend->legend = "BEND RANGE";
     }
 
     /* --------------------------------------------------------------------------------- LFO --- */
-    section({404, 72, 168, 300}, "LFO");
+    cdx = -197;
+    section({404, 72, 168, 300}, "LFO", false, {207, 120, 168, 476});
     auto *lfoRate = knob("lfo_rate", "RATE/TIME", {410, 90, 84, 96});
     auto *lfoDiv = knob("lfo_div", "RATE/TIME", {410, 90, 84, 96});
     sync(lfoRate, lfoDiv, LFO_SYNC);
@@ -280,10 +338,10 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     text({412, 300, 150, 64}, "ENVELOPE: per voice,\nonce per note, RATE/TIME\nits length", 9.5f);
 
     /* ----------------------------------------------------------------------------- VIBRATO --- */
-    section({404, 380, 168, 168}, "VIBRATO");
-    sel("vibrato", {"OFF", "DLY 1", "DLY 2", "WHEEL"}, {412, 398, 84, 138});
-    knob("vib_rate", "RATE", {500, 396, 64, 70});
-    knob("vib_amt", "AMOUNT", {500, 470, 64, 70});
+    section({404, 380, 168, 168}, "VIBRATO", false, {679, r2, 230, 170});
+    sel("vibrato", {"OFF", "DLY 1", "DLY 2", "WHEEL"}, {412, 398, 84, 138}, {}, {687, r2 + 22, 80, 140});
+    knob("vib_rate", "RATE", {500, 396, 64, 70}, {769, r2 + 34, 66, 84});
+    knob("vib_amt", "AMOUNT", {500, 470, 64, 70}, {837, r2 + 34, 66, 84});
 
     /* ----------------------------------------------------------------------------- MOD ENV --- */
     section({580, 72, 118, 476}, "MOD ENV");
@@ -298,7 +356,7 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     section({716, 102, 116, 304}, "MODULATION", true);
     knob("osc_lfo", "LFO AMT", {722, 112, 104, 114});
     knob("osc_menv", "MODENV AMT", {722, 240, 104, 114});
-    page.arrows.push_back({800.0f, 408.0f, 880.0f, 440.0f});
+    arrow({800.0f, 408.0f, 880.0f, 440.0f});
     {
         auto *w = add(new Endless(a, "osc_wave", ui, waveShort, [](int w) { return String(waveLongName(w)); }, waveGroup),
                       {846, 90, 120, 146});
@@ -340,7 +398,7 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     section({1122, 102, 100, 304}, "MODULATION", true);
     knob("flt_lfo", "LFO AMT", {1126, 112, 92, 108});
     knob("flt_menv", "MODENV AMT", {1126, 240, 92, 108});
-    page.arrows.push_back({1224.0f, 214.0f, 1246.0f, 214.0f});
+    arrow({1224.0f, 214.0f, 1246.0f, 214.0f});
     auto *freq = knob("flt_freq", "FREQ", {1228, 84, 180, 196});
     freq->redCap = true;
     knob("flt_res", "RESONANCE", {1228, 292, 92, 104});
@@ -352,66 +410,58 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     }
 
     /* ----------------------------------------------------------------------------- AMP ENV --- */
-    section({1422, 72, 118, 476}, "AMP ENV");
-    knob("aenv_a", "ATTACK", {1430, 92, 102, 104});
-    knob("aenv_d", "DECAY", {1430, 204, 102, 104});
-    knob("aenv_r", "RELEASE", {1430, 316, 102, 104});
-    key("aenv_vel", "VEL", {1456, 440, 50, 54});
+    section({1422, 72, 118, 476}, "AMP ENV", false, {917, r2, 300, 170});
+    knob("aenv_a", "ATTACK", {1430, 92, 102, 104}, {923, r2 + 26, 80, 104});
+    knob("aenv_d", "DECAY", {1430, 204, 102, 104}, {1003, r2 + 26, 80, 104});
+    knob("aenv_r", "RELEASE", {1430, 316, 102, 104}, {1083, r2 + 26, 80, 104});
+    key("aenv_vel", "VEL", {1456, 440, 50, 54}, {1163, r2 + 46, 50, 54});
 
     /* ---------------------------------------------------------------------------------- FX --- */
-    section({1548, 72, 136, 236}, "FX");
-    knob("fx_amt", "RATE/AMT", {1554, 90, 80, 94});
-    key("fx_on", "ON", {1638, 96, 40, 54});
-    sel("fx_type", {"FLANGER", "PHASER", "RING MOD", "CHORUS", "ENSEMBLE", "DRIVE"}, {1556, 184, 122, 120})->rowH = 16;
+    section({1548, 72, 136, 236}, "FX", false, {23, r3, 300, 170});
+    knob("fx_amt", "RATE/AMT", {1554, 90, 80, 94}, {29, r3 + 30, 84, 100});
+    key("fx_on", "ON", {1638, 96, 40, 54}, {115, r3 + 40, 44, 54});
+    sel("fx_type", {"FLANGER", "PHASER", "RING MOD", "CHORUS", "ENSEMBLE", "DRIVE"}, {1556, 184, 122, 120}, {},
+        {163, r3 + 26, 154, 136})->rowH = 16;
 
     /* ------------------------------------------------------------------------------ OUTPUT --- */
-    section({1548, 316, 136, 232}, "OUTPUT");
-    knob("out_level", "LEVEL", {1558, 334, 116, 120});
-    knob("out_pan", "PAN", {1572, 458, 88, 84})->bipolar = true;
+    section({1548, 316, 136, 232}, "OUTPUT", false, {1019, r3, 198, 170});
+    knob("out_level", "LEVEL", {1558, 334, 116, 120}, {1025, r3 + 24, 104, 118});
+    knob("out_pan", "PAN", {1572, 458, 88, 84}, {1129, r3 + 34, 84, 96})->bipolar = true;
 
     /* ------------------------------------------------------------------------------- DELAY --- */
-    section({1692, 72, 136, 300}, "DELAY");
-    auto *dTime = knob("dly_time", "TEMPO", {1698, 90, 82, 94});
-    auto *dDiv = knob("dly_div", "TEMPO", {1698, 90, 82, 94});
+    section({1692, 72, 136, 300}, "DELAY", false, {331, r3, 440, 170});
+    auto *dTime = knob("dly_time", "TEMPO", {1698, 90, 82, 94}, {337, r3 + 30, 84, 100});
+    auto *dDiv = knob("dly_div", "TEMPO", {1698, 90, 82, 94}, {337, r3 + 30, 84, 100});
     sync(dTime, dDiv, DLY_SYNC);
-    key("dly_sync", "MST CLK", {1782, 96, 44, 54});
-    sel("dly_fb", {"1", "2", "3", "4"}, {1700, 190, 62, 106}, "FEEDBK");
-    key("dly_ping", "PING", {1770, 186, 52, 54});
-    key("dly_analog", "ANALOG", {1770, 244, 52, 54});
-    knob("dly_mix", "DRY/WET", {1698, 294, 70, 74});
-    key("dly_on", "ON", {1772, 306, 48, 54});
+    key("dly_sync", "MST CLK", {1782, 96, 44, 54}, {423, r3 + 40, 54, 54});
+    sel("dly_fb", {"1", "2", "3", "4"}, {1700, 190, 62, 106}, "FEEDBK", {481, r3 + 28, 58, 132});
+    key("dly_ping", "PING", {1770, 186, 52, 54}, {543, r3 + 40, 52, 54});
+    key("dly_analog", "ANALOG", {1770, 244, 52, 54}, {597, r3 + 40, 56, 54});
+    knob("dly_mix", "DRY/WET", {1698, 294, 70, 74}, {655, r3 + 34, 72, 92});
+    key("dly_on", "ON", {1772, 306, 48, 54}, {727, r3 + 40, 40, 54});
 
     /* ------------------------------------------------------------------------------ REVERB --- */
-    section({1692, 380, 136, 168}, "REVERB");
-    knob("rev_mix", "DRY/WET", {1698, 396, 70, 74});
-    key("rev_on", "ON", {1772, 404, 48, 54});
+    section({1692, 380, 136, 168}, "REVERB", false, {779, r3, 232, 170});
+    knob("rev_mix", "DRY/WET", {1698, 396, 70, 74}, {785, r3 + 30, 80, 98});
+    key("rev_on", "ON", {1772, 404, 48, 54}, {867, r3 + 40, 44, 54});
     {
-        auto *rt = sel("rev_type", {"ROOM", "STAGE 1", "STAGE 2", "HALL 1", "HALL 2"}, {1698, 474, 126, 70});
+        auto *rt = sel("rev_type", {"ROOM", "STAGE 1", "STAGE 2", "HALL 1", "HALL 2"}, {1698, 474, 126, 70}, {},
+                       {915, r3 + 24, 92, 140});
         rt->twoColumns = true;
         rt->rowH = 14;
+        compactTwoCols.push_back(rt);
     }
 
-    for (float sx : {8.0f, (float)W * 0.5f, (float)W - 8.0f})   /* the panel's screws */
-        for (float sy : {8.0f, (float)H - 8.0f})
-            page.screws.push_back({sx, sy});
 
     for (auto *c : page.getChildren())
         if (dynamic_cast<Lamp *>(c) || dynamic_cast<Wheel *>(c))
             live.push_back(c);
     live.push_back(header);
 
-    page.setSize(W, H);
     addAndMakeVisible(page);
     setResizable(true, true);
-    getConstrainer()->setFixedAspectRatio((double)W / (double)H);
-    setResizeLimits(W * 2 / 5, H * 2 / 5, (int)(W * 1.5f), (int)(H * 1.5f));
-    /* the window: as it was left, or (the first time) as large as the screen allows, and never larger than it */
-    float fit = 1.0f;
-    if (auto *d = Desktop::getInstance().getDisplays().getPrimaryDisplay())
-        fit = jmin(1.25f, 0.96f * (float)d->userArea.getWidth() / (float)W, 0.88f * (float)d->userArea.getHeight() / (float)H);
-    float s = proc.uiScale.load();
-    s = s < 0.0f ? fit : jmin(s, jmax(fit, 0.4f));
-    setSize((int)std::lround(W * jmax(0.4f, s)), (int)std::lround(H * jmax(0.4f, s)));
+    /* the window: as it was left, or (the first time, or on a new layout) as large as the screen allows */
+    place(proc.uiLayout.load() == 1);
     timerCallback();
     startTimerHz(30);
 }
@@ -425,7 +475,7 @@ NiqueEditor::~NiqueEditor()
 
 void NiqueEditor::resized()
 {
-    float s = (float)getWidth() / (float)W;
+    float s = (float)getWidth() / (float)(page.compact ? WC : W);
     page.setTransform(AffineTransform::scale(s));
     proc.uiScale = s;
 }

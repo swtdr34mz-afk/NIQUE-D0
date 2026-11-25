@@ -6,6 +6,11 @@ file), **VST3** for Windows, and a **standalone app** for both. After the idea o
 
 ![NIQUE D0](docs/panel.png)
 
+The **4:3** key (top right) lays the panel out for smaller screens: the arpeggiator, voice mode, vibrato, amp
+envelope and the effects lie down in two rows below the oscillators and the filter; the key again goes back.
+
+![NIQUE D0, 4:3](docs/panel-4x3.png)
+
 One synth part with 24 voices (in a DAW: one instance per part, instead of the A1's four slots):
 
 - **OSCILLATORS:** 47 waveforms: PULSE, SAW, TRI, SINE; A1–A7 (extended analogue); P1–P3 (fixed pulse widths);

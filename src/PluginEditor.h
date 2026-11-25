@@ -10,7 +10,8 @@
 class NiqueEditor : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
-    static constexpr int W = 1840, H = 600;
+    static constexpr int W = 1840, H = 600;   /* NORMAL */
+    static constexpr int WC = 1240, HC = 998; /* 4:3 */
     explicit NiqueEditor(NiqueProcessor &);
     ~NiqueEditor() override;
     void resized() override;
@@ -19,20 +20,21 @@ public:
     /* the page: the background drawn once (the panel, the sections, the print), the controls on it */
     struct Page : juce::Component {
         struct Sec {
-            juce::Rectangle<float> r;
+            juce::Rectangle<float> r, rc;    /* (NORMAL, 4:3) */
             juce::String title;
             bool sub;
         };
         struct Text {
-            juce::Rectangle<float> r;
+            juce::Rectangle<float> r, rc;
             juce::String text;
             float size;
             juce::Justification j;
         };
         std::vector<Sec> sections;
         std::vector<Text> texts;
-        std::vector<juce::Point<float>> screws;
-        std::vector<juce::Line<float>> arrows;
+        std::vector<std::pair<juce::Line<float>, juce::Line<float>>> arrows;
+        bool compact = false;
+        void dropCache() { cache = juce::Image(); }
         ~Page() override { deleteAllChildren(); }
         void paint(juce::Graphics &) override;
 
@@ -60,14 +62,27 @@ private:
     std::vector<int> syncParams;
     juce::Component *ctrlHint = nullptr;
 
-    template <class C> C *add(C *c, juce::Rectangle<int> r)
+    /* every control's place in both layouts (4:3 empty: NORMAL's moved by cdx, cdy) */
+    struct Placed {
+        juce::Component *c;
+        juce::Rectangle<int> normal, compact;
+    };
+    std::vector<Placed> placed;
+    std::vector<nq::Selector *> compactTwoCols;
+    int cdx = 0, cdy = 0;
+    bool placedOnce = false;
+    template <class C> C *add(C *c, juce::Rectangle<int> r, juce::Rectangle<int> rc = {})
     {
         page.addAndMakeVisible(c);
         c->setBounds(r);
+        placed.push_back({c, r, rc.isEmpty() ? r.translated(cdx, cdy) : rc});
         return c;
     }
-    nq::Knob *knob(const char *id, const juce::String &legend, juce::Rectangle<int> r, float size = 0.0f);
-    void section(juce::Rectangle<int> r, const juce::String &title, bool sub = false);
+    void place(bool compact);
+    nq::Knob *knob(const char *id, const juce::String &legend, juce::Rectangle<int> r, juce::Rectangle<int> rc = {},
+                   float size = 0.0f);
+    void section(juce::Rectangle<int> r, const juce::String &title, bool sub = false, juce::Rectangle<int> rc = {});
     void text(juce::Rectangle<int> r, const juce::String &t, float size = 11.0f,
-              juce::Justification j = juce::Justification::centred);
+              juce::Justification j = juce::Justification::centred, juce::Rectangle<int> rc = {});
+    void arrow(juce::Line<float> l, juce::Line<float> lc = {});
 };
