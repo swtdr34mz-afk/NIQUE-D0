@@ -6,8 +6,8 @@ file), **VST3** for Windows, and a **standalone app** for both. After the idea o
 
 ![NIQUE D0](docs/panel.png)
 
-The **4:3** key (top right) lays the panel out for smaller screens: the arpeggiator, voice mode, vibrato, amp
-envelope and the effects lie down in two rows below the oscillators and the filter; the key again goes back.
+The **4:3** key (top right) lays the panel out for smaller screens: the vibrato goes under the LFO, the arpeggiator,
+voice mode, amp envelope and the effects lie down in two rows below the oscillators and the filter; the key again goes back.
 
 ![NIQUE D0, 4:3](docs/panel-4x3.png)
 

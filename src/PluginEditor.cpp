@@ -327,7 +327,7 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
 
     /* --------------------------------------------------------------------------------- LFO --- */
     cdx = -197;
-    section({404, 72, 168, 300}, "LFO", false, {207, 120, 168, 476});
+    section({404, 72, 168, 300}, "LFO");
     auto *lfoRate = knob("lfo_rate", "RATE/TIME", {410, 90, 84, 96});
     auto *lfoDiv = knob("lfo_div", "RATE/TIME", {410, 90, 84, 96});
     sync(lfoRate, lfoDiv, LFO_SYNC);
@@ -338,10 +338,10 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     text({412, 300, 150, 64}, "ENVELOPE: per voice,\nonce per note, RATE/TIME\nits length", 9.5f);
 
     /* ----------------------------------------------------------------------------- VIBRATO --- */
-    section({404, 380, 168, 168}, "VIBRATO", false, {679, r2, 230, 170});
-    sel("vibrato", {"OFF", "DLY 1", "DLY 2", "WHEEL"}, {412, 398, 84, 138}, {}, {687, r2 + 22, 80, 140});
-    knob("vib_rate", "RATE", {500, 396, 64, 70}, {769, r2 + 34, 66, 84});
-    knob("vib_amt", "AMOUNT", {500, 470, 64, 70}, {837, r2 + 34, 66, 84});
+    section({404, 380, 168, 168}, "VIBRATO");   /* (4:3 too: under the LFO) */
+    sel("vibrato", {"OFF", "DLY 1", "DLY 2", "WHEEL"}, {412, 398, 84, 138});
+    knob("vib_rate", "RATE", {500, 396, 64, 70});
+    knob("vib_amt", "AMOUNT", {500, 470, 64, 70});
 
     /* ----------------------------------------------------------------------------- MOD ENV --- */
     section({580, 72, 118, 476}, "MOD ENV");
@@ -410,11 +410,11 @@ NiqueEditor::NiqueEditor(NiqueProcessor &p) : AudioProcessorEditor(&p), proc(p)
     }
 
     /* ----------------------------------------------------------------------------- AMP ENV --- */
-    section({1422, 72, 118, 476}, "AMP ENV", false, {917, r2, 300, 170});
-    knob("aenv_a", "ATTACK", {1430, 92, 102, 104}, {923, r2 + 26, 80, 104});
-    knob("aenv_d", "DECAY", {1430, 204, 102, 104}, {1003, r2 + 26, 80, 104});
-    knob("aenv_r", "RELEASE", {1430, 316, 102, 104}, {1083, r2 + 26, 80, 104});
-    key("aenv_vel", "VEL", {1456, 440, 50, 54}, {1163, r2 + 46, 50, 54});
+    section({1422, 72, 118, 476}, "AMP ENV", false, {679, r2, 538, 170});   /* (4:3: the second row's rest) */
+    knob("aenv_a", "ATTACK", {1430, 92, 102, 104}, {697, r2 + 18, 130, 146});
+    knob("aenv_d", "DECAY", {1430, 204, 102, 104}, {847, r2 + 18, 130, 146});
+    knob("aenv_r", "RELEASE", {1430, 316, 102, 104}, {997, r2 + 18, 130, 146});
+    key("aenv_vel", "VEL", {1456, 440, 50, 54}, {1145, r2 + 52, 56, 54});
 
     /* ---------------------------------------------------------------------------------- FX --- */
     section({1548, 72, 136, 236}, "FX", false, {23, r3, 300, 170});
