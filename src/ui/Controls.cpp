@@ -13,6 +13,18 @@ static RangedAudioParameter &need(APVTS &a, const String &id)
     return *p;
 }
 
+/* a right-click: the host's menu for this parameter (MIDI learn, automation ...), never a change of its value */
+static bool hostMenu(Component &c, const MouseEvent &e, RangedAudioParameter &p)
+{
+    if (!e.mods.isPopupMenu())
+        return false;
+    if (auto *ed = c.findParentComponentOfClass<AudioProcessorEditor>())
+        if (auto *host = ed->getHostContext())
+            if (auto menu = host->getContextMenuForParameter(&p))
+                menu->showNativeMenu(ed->getMouseXYRelative());
+    return true;
+}
+
 /* ============================================================================================== Knob === */
 Knob::Knob(APVTS &a, const String &id, const String &lg, UiState &u)
     : param(need(a, id)), legend(lg), ui(u), att(param, [this](float) { repaint(); }, nullptr)
@@ -66,6 +78,9 @@ void Knob::mouseEnter(const MouseEvent &) { ui.touched(editing ? *editing : para
 
 void Knob::mouseDown(const MouseEvent &e)
 {
+    editing = nullptr;
+    if (hostMenu(*this, e, param))
+        return;
     editing = &param;
     if (ui.morph == 1 && mw)
         editing = mw;
@@ -96,7 +111,7 @@ void Knob::setFromDrag(float v)
 
 void Knob::mouseDrag(const MouseEvent &e)
 {
-    if (!editing)
+    if (!editing || e.mods.isPopupMenu())
         return;
     float speed = e.mods.isShiftDown() || e.mods.isCommandDown() ? 1.0f / 1000.0f : 1.0f / 220.0f;
     setFromDrag(startValue + (startY - e.position.y) * speed);
@@ -104,6 +119,8 @@ void Knob::mouseDrag(const MouseEvent &e)
 
 void Knob::mouseUp(const MouseEvent &)
 {
+    if (editing == nullptr)              /* (after a right-click: nothing was begun) */
+        return;
     if (editing == &param)
         att.endGesture();
     else if (editing == mw)
@@ -113,8 +130,10 @@ void Knob::mouseUp(const MouseEvent &)
     editing = nullptr;
 }
 
-void Knob::mouseDoubleClick(const MouseEvent &)
+void Knob::mouseDoubleClick(const MouseEvent &e)
 {
+    if (e.mods.isPopupMenu())
+        return;
     if (ui.morph == 1 && mw)
         attW->setValueAsCompleteGesture(mw->convertFrom0to1(0.5f));
     else if (ui.morph == 2 && mv)
@@ -168,8 +187,10 @@ void Key::paint(Graphics &g)
 
 void Key::mouseEnter(const MouseEvent &) { ui.touched(param); }
 
-void Key::mouseDown(const MouseEvent &)
+void Key::mouseDown(const MouseEvent &e)
 {
+    if (hostMenu(*this, e, param))
+        return;
     down = true;
     att.setValueAsCompleteGesture(on() ? 0.0f : 1.0f);
     ui.touched(param);
@@ -250,6 +271,8 @@ void Selector::mouseEnter(const MouseEvent &) { ui.touched(param); }
 
 void Selector::mouseDown(const MouseEvent &e)
 {
+    if (hostMenu(*this, e, param))
+        return;
     if (hasKey && keyArea().expanded(4.0f).contains(e.position)) {
         down = true;
         int cur = current(), pos = -1;
@@ -350,6 +373,9 @@ void Endless::mouseEnter(const MouseEvent &) { ui.touched(param); }
 
 void Endless::mouseDown(const MouseEvent &e)
 {
+    popup = hostMenu(*this, e, param);
+    if (popup)
+        return;
     acc = 0.0f;
     lastY = e.position.y;
     dragged = false;
@@ -358,6 +384,8 @@ void Endless::mouseDown(const MouseEvent &e)
 
 void Endless::mouseDrag(const MouseEvent &e)
 {
+    if (popup || e.mods.isPopupMenu())
+        return;
     acc += (lastY - e.position.y) / 14.0f;
     lastY = e.position.y;
     while (acc >= 1.0f) {
@@ -374,6 +402,10 @@ void Endless::mouseDrag(const MouseEvent &e)
 
 void Endless::mouseUp(const MouseEvent &e)
 {
+    if (popup) {
+        popup = false;
+        return;
+    }
     if (!dragged && e.mouseWasClicked())
         menu();
 }
@@ -420,6 +452,8 @@ void ActionKey::paint(Graphics &g)
 
 void ActionKey::mouseDown(const MouseEvent &e)
 {
+    if (e.mods.isPopupMenu())            /* (no parameter: a right-click does nothing) */
+        return;
     down = true;
     repaint();
     if (action)
@@ -439,12 +473,16 @@ void Wheel::paint(Graphics &g) { drawWheel(g, getLocalBounds().toFloat(), get(),
 
 void Wheel::mouseDown(const MouseEvent &e)
 {
+    if (e.mods.isPopupMenu())
+        return;
     startV = get();
     startY = e.position.y;
 }
 
 void Wheel::mouseDrag(const MouseEvent &e)
 {
+    if (e.mods.isPopupMenu())
+        return;
     float h = (float)getHeight() - 16.0f;
     set(jlimit(0.0f, 1.0f, startV + (startY - e.position.y) / jmax(10.0f, h)));
     repaint();
