@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 swtdr34mz (NIQUE D0) */
-/* The panel's controls, each tied to host parameters: a knob (and its morphs: with a morph chosen, turning the knob
+/* The panel's controls, each tied to host parameters (a right-click on any of them: the host's menu for its
+ * parameter, MIDI learn and automation, never a change of its value): a knob (and its morphs: with a morph chosen, turning the knob
  * sets where that morph takes it), a key with its LED (a switch), a selector (a key stepping through LEDs; a click
  * on a name picks it), an endless knob with a display (the waveform, the configuration), a momentary key with a
  * job, a wheel (the mod wheel, the pitch stick), a lamp. Touching one shows its name and value in the readout. */
@@ -112,7 +113,7 @@ private:
     std::function<juce::String(int)> shortName, longName, group;
     juce::ParameterAttachment att;
     float acc = 0.0f, lastY = 0.0f, angle = 0.0f;
-    bool dragged = false;
+    bool dragged = false, popup = false;
     int count() const;
     int current() const;
     void step(int d);
