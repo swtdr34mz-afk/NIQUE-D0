@@ -33,11 +33,15 @@ set(NQ_FORMATS VST3 Standalone)
 if(APPLE)
     list(APPEND NQ_FORMATS AU)
 endif()
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(APPEND NQ_FORMATS LV2)
+endif()
 
 juce_add_plugin(NiqueD0
     PRODUCT_NAME "NIQUE D0"
     COMPANY_NAME "swtdr34mz"
     BUNDLE_ID "com.swtdr34mz.niqued0"
+    LV2URI "https://github.com/swtdr34mz-afk/NIQUE-D0"
     PLUGIN_MANUFACTURER_CODE Swtd
     PLUGIN_CODE Nqd0
     FORMATS ${NQ_FORMATS}

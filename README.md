@@ -66,6 +66,8 @@ ladder never), and every knob move is smoothed. The effects read their delay lin
 Unzip `NIQUED0-Windows.zip` and copy `NIQUE D0.vst3` to `C:\Program Files\Common Files\VST3`. The standalone app
 `NIQUE D0.exe` runs without a DAW.
 
+**Linux (Bitwig, Reaper, Ardour, ...):** Die `.tar.gz` entpacken. `NIQUE D0.vst3` nach `~/.vst3/` kopieren, `NIQUE D0.lv2` nach `~/.lv2/`. Die App `NIQUE D0` startet auch ohne DAW. 64 Bit, gebaut auf Ubuntu 22.04.
+
 ## Building
 
 ```
