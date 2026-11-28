@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 swtdr34mz (NIQUE D0) */
 #include "PluginEditor.h"
+#include "PanelDialog.h"
+#include "WindowSize.h"
 
 using namespace nq;
 using namespace juce;
@@ -195,6 +197,9 @@ void NiqueEditor::place(bool compact)
         sl->rowH = compact ? 17 : 14;
     }
     const int w = compact ? WC : W, h = compact ? HC : H;
+    /* the size it was left at, read before the limits below resize the window (a new instance: the last size used) */
+    const float kept = proc.uiScale.load() < 0.0f ? (float)winsize::last(compact ? "NIQUE-D0-compact" : "NIQUE-D0", -1.0) : proc.uiScale.load();
+    sized = false;
     page.setSize(w, h);
     header->setBounds(0, 0, w, compact ? 112 : 64);
     proc.uiLayout = compact ? 1 : 0;
@@ -203,9 +208,10 @@ void NiqueEditor::place(bool compact)
         fit = jmin(1.25f, 0.96f * (float)d->userArea.getWidth() / (float)w, 0.88f * (float)d->userArea.getHeight() / (float)h);
     getConstrainer()->setFixedAspectRatio((double)w / (double)h);
     setResizeLimits(w * 2 / 5, h * 2 / 5, (int)(w * 1.5f), (int)(h * 1.5f));
-    float s = placedOnce ? fit : proc.uiScale.load();
+    float s = placedOnce ? fit : kept;
     s = s < 0.0f ? fit : jmin(s, jmax(fit, 0.4f));
     placedOnce = true;
+    sized = true;
     setSize((int)std::lround((float)w * jmax(0.4f, s)), (int)std::lround((float)h * jmax(0.4f, s)));
     resized();
     page.repaint();
@@ -477,7 +483,10 @@ void NiqueEditor::resized()
 {
     float s = (float)getWidth() / (float)(page.compact ? WC : W);
     page.setTransform(AffineTransform::scale(s));
+    if (!sized)
+        return;
     proc.uiScale = s;
+    winsize::remember(page.compact ? "NIQUE-D0-compact" : "NIQUE-D0", (double)s);
 }
 
 void NiqueEditor::timerCallback()
@@ -558,9 +567,10 @@ void NiqueEditor::saveProgram()
     w->addButton("STORE", 1, KeyPress(KeyPress::returnKey));
     w->addButton("CANCEL", 0, KeyPress(KeyPress::escapeKey));
     SafePointer<NiqueEditor> self(this);
+    pdlg::showInside(*this, w);
     w->enterModalState(true, ModalCallbackFunction::create([self, w](int r) {
                            if (self && r == 1)
-                               self->proc.writePreset(w->getTextEditorContents("name"));
+                               pdlg::checked(self->proc.writePreset(w->getTextEditorContents("name")), *self);
                            if (self)
                                self->header->repaint();
                        }),

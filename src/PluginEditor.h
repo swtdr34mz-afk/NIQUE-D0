@@ -15,6 +15,7 @@ public:
     explicit NiqueEditor(NiqueProcessor &);
     ~NiqueEditor() override;
     void resized() override;
+    bool sized = false;                      /* (resizes during the constructor keep nothing) */
     void paint(juce::Graphics &) override {}
 
     /* the page: the background drawn once (the panel, the sections, the print), the controls on it */
