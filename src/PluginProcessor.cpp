@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MPL-2.0
  * Copyright (C) 2026 swtdr34mz (NIQUE D0) */
 #include "PluginProcessor.h"
+#include "PanelDialog.h"
 #include "PluginEditor.h"
 
 using namespace nq;
@@ -44,7 +45,7 @@ NiqueProcessor::NiqueProcessor()
 /* ------------------------------------------------------------------------------------------ programs --- */
 juce::File NiqueProcessor::presetFolder()
 {
-    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("NIQUE D0").getChildFile("Presets");
+    return pdlg::docsOrAppData().getChildFile("NIQUE D0").getChildFile("Presets");
 }
 
 void NiqueProcessor::loadUserPresets()
